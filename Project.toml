@@ -1,0 +1,13 @@
+name = "QAOALandscapes"
+uuid = "ccb4373d-55c9-4771-9d60-04573b2abef6"
+authors = ["Raimel A. Medina"]
+version = "1.0.0-DEV"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

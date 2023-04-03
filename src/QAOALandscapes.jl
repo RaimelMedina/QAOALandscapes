@@ -6,11 +6,11 @@ export toFundamentalRegion!
 export getStateJacobian, quantumFisherInfoMatrix
 export getInitParameter
 # Functions related to different initialization strategies
-# First Interp
+# Interp
 export interpInitialization, rollDownInterp, interpOptimize
-# Second Fourier
+# Fourier
 export toFourierParams, fromFourierParams, fourierInitialization, fourierJacobian, rollDownFourier, fourierOptimize
-# Third Transition states
+# Transition states
 export transitionState, permuteHessian, getNegativeHessEigval, index1Direction, rollDownTS, greedyOptimize, greedySelect
 
 # Some useful Functions

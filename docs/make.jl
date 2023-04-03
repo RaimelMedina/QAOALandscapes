@@ -1,6 +1,5 @@
 using QAOALandscapes
 using Documenter
-using DocumenterMarkdown
 
 DocMeta.setdocmeta!(QAOALandscapes, :DocTestSetup, :(using QAOALandscapes); recursive=true)
 

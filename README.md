@@ -6,6 +6,7 @@
 [![Coverage](https://codecov.io/gh/RaimelMedina/QAOALandscapes.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/RaimelMedina/QAOALandscapes.jl)
 
 This repository implements contains the code for the QAOA landscape exploration project. Currently, we have implemented three different initialization and optimization strategies:
+    
     1. Transition states
     2. Interpolation (Interp) strategy
     3. Fourier strategy

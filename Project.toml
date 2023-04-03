@@ -4,6 +4,8 @@ authors = ["Raimel A. Medina"]
 version = "1.0.0-DEV"
 
 [deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+DocumenterMarkdown = "997ab1e6-3595-5248-9280-8efb232c3433"
 FLoops = "cc61a311-1640-44b5-9fba-1b764f453329"
 FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
 Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"

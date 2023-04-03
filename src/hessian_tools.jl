@@ -24,14 +24,14 @@ function elementHessianCostFunction(qaoa::QAOA, Γ::Vector{Float64}, idx::Vector
 end
 
 @doc raw"""
-    getHessianEigval(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric", ϵ=cbrt(eps(Float64)))
+    getNegativeHessEigvalssianEigval(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric", ϵ=cbrt(eps(Float64)))
 
 Computes the approximation to the minimum (negative) eigenvalue of the Hessian at the TS obtained by padding with zeros
 the local minimum `Γmin`. The transition state is completely specified by the index of the γ component `ig`, and the 
 type of transition states (`"symmetric"` or `"non_symmetric"`). The cost of obtaining this approximate eigenvalue is basically
 the cost of computing two matrix elements of a Hessian.
 """
-function getHessianEigval(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric", ϵ=cbrt(eps(Float64)))
+function getNegativeHessEigval(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric", ϵ=cbrt(eps(Float64)))
     ΓTs = transitionState(Γmin, ig, tsType=tsType)
     p    = length(Γmin) ÷ 2
     
@@ -64,7 +64,7 @@ Computes the permutation that takes the Hessian at a particular transition state
 Basically, the last two rows and columns of the transformed Hessian correspond to the indexes where the zeros were inserted.
 
 # Arguments
-* `depth::Int`: Circuit depth of the transition state. That is, `length(ΓTs) \div 2 = depth`
+* `depth::Int`: Circuit depth of the transition state.
 * `i::Int`: Index of the γ component at which the zero is added. If `tsType='symmetric'` then `β=i`, otherwise if `tsType='non_symmetric'` `β=i-1`.
 
 # Return
@@ -94,7 +94,7 @@ function permuteHessian(depth::Int, i::Int; tsType="symmetric")
 end
 
 @doc raw"""
-permuteHessian(H::AbstractArray{Float64,2}, i::Int; tsType="symmetric")
+    permuteHessian(H::AbstractArray{Float64,2}, i::Int; tsType="symmetric")
 
 Computes the permutation that takes the Hessian at a particular transition state into the form described in the paper
 Basically, the last two rows and columns of the transformed Hessian correspond to the indexes where the zeros were inserted.
@@ -116,11 +116,11 @@ function permuteHessian(H::AbstractArray{Float64,2}, i::Int; tsType="symmetric",
 end
 
 @doc raw"""
-index1Direction(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric", doChecks=false)
+    index1Direction(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric", doChecks=false)
 
 Computes the approximate eigenvalue and index-1 eigenvector of the Hessian at the transition state obtained from the local minimum 
-`Γmin` and completely specified by the parameters `iγ` and `tsType="symmetric"`. If the optional parameter `doChecks=false`
-is set to `true` then the function also returns the relative error in estimating the true eigenvalue as well as the inner product between
+`Γmin`. It is completely specified by the parameters `iγ` and `tsType="symmetric"`. If the optional parameter `doChecks=false`
+is set to `true`, then the function also returns the relative error in estimating the true eigenvalue as well as the inner product between
 the approximate and true eigenvector
 
 # Arguments 
@@ -131,6 +131,9 @@ the approximate and true eigenvector
 
 # Optional arguments
 * `doChecks=false`: In this case the function returns a dictionary with keys `eigvec_approx` and `eigval_approx`. If set to true it has additional keys => `change_basis`, `eigvec_fidelity` and `eigval_error`
+
+# Returns
+* `result::Dict` Dictionary with the following keys: `eigvec_approx`, `eigval_approx`. If `doChecks=true` the following additional keys are available: `change_basis`, `eigvec_fidelity` and `eigval_error`
 """
 function index1Direction(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric", doChecks=false)
     p   = length(Γmin) ÷ 2
@@ -144,7 +147,7 @@ function index1Direction(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="sy
     vApproximate = zeros(dim)
 
     #now compute the approximation to the eigenvalue :) 
-    b, bbar = getHessianEigval(qaoa, Γmin, ig; tsType=tsType)
+    b, bbar = getNegativeHessEigvalssianEigval(qaoa, Γmin, ig; tsType=tsType)
     #we use bbar, or more specifically its sign to determine
     #the approximate eigenvector
 

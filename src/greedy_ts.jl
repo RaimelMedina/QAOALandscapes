@@ -11,7 +11,7 @@ end
 function greedyOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int, igamma::Int; tsType="symmetric", ϵ=0.001, optim=Val(:BFGS), chooseSmooth=false)
     listMinima = Dict{Int64, Tuple{Float64, Vector{Float64}}}()
     p = 1
-    Γmin, Emin = train!(optim, qaoa, Γ0; printout = false)
+    Γmin, Emin = optimizeParameters(optim, qaoa, Γ0; printout = false)
     listMinima[p] = (Emin, Γmin)
 
     println("Circuit depth  | Energy    | gradient norm ")
@@ -37,7 +37,7 @@ end
 function greedyOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int; ϵ=0.001, optim=Val(:BFGS), threaded=false, chooseSmooth=false)
     listMinima = Dict{Int64, Tuple{Float64, Vector{Float64}}}()
     p = 1
-    Γmin, Emin = train!(optim, qaoa, Γ0; printout = false)
+    Γmin, Emin = optimizeParameters(optim, qaoa, Γ0; printout = false)
     listMinima[p] = (Emin, Γmin)
 
     println("Circuit depth  | Energy    | gradient norm ")
@@ -55,7 +55,7 @@ end
 function greedyOptimizeWithCurvature(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int; ϵ=0.001, optim=Val(:BFGS), chooseSmooth=false)
     listMinima = Dict{Int64, Tuple{Float64, Vector{Float64}}}()
     p = 1
-    Γmin, Emin = train!(optim, qaoa, Γ0; printout = false)
+    Γmin, Emin = optimizeParameters(optim, qaoa, Γ0; printout = false)
     listMinima[p] = (Emin, Γmin)
 
     println("Circuit depth  | Energy    | gradient norm ")

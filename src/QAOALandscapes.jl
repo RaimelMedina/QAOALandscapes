@@ -1,14 +1,21 @@
 module QAOALandscapes
 
-export QAOA, Hx, Hz, spinChain, constructUnitary, addCircuitLayer!, costFunction, gradCostFunction, hessianCostFunction, elementHessianCostFunction, getQAOAState
-export interpInitialization, transitionState, toFundamentalRegion!, train!, permuteHessian, index1Direction
-export rollDownInterp, rollDownTS, greedySelect, greedyOptimize, interpOptimize, rollDownWithCurvature, greedyOptimizeWithCurvature
-export getHessianEigval
-export gradStdTest, selectSmoothParameter, whichTSType, _onehot
-export fourierJacobian, fourierInitialization, fromFourierParams, toFourierParams, trainFourier!, fourierOptimize, rollDownFourier
-export fwht, ifwht
-export getStateJacobian, quantumFisherInfoMatrix, getInitParameter
+# Functions related to an arbitrary QAOA  
+export QAOA, HxDiag, HxDiagSymmetric, HzzDiag, HzzDiagSymmetric, gradCostFunction, hessianCostFunction, getQAOAState, elementHessianCostFunction, optimizeParameters
+export toFundamentalRegion!
+export getStateJacobian, quantumFisherInfoMatrix
+export getInitParameter
+# Functions related to different initialization strategies
+# First Interp
+export interpInitialization, rollDownInterp, interpOptimize
+# Second Fourier
+export toFourierParams, fromFourierParams, fourierInitialization, fourierJacobian, rollDownFourier, fourierOptimize
+# Third Transition states
+export transitionState, permuteHessian, getNegativeHessEigval, index1Direction, rollDownTS, greedyOptimize, greedySelect
+
+# Some useful Functions
 export spinChain
+export gradStdTest, selectSmoothParameter, whichTSType, _onehot
 
 using Yao
 using Graphs

@@ -61,7 +61,19 @@ function rollDownFourier(qaoa::QAOA, Γmin::Vector{Float64})
     return Γmin_fourier, Emin_fourier
 end
 
+@doc raw"""
+    fourierOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int)
+    
+Starting from a local minima `Γ0` at ``p=1`` it performs the `Fourier` optimization strategy until the circuit depth `pmax` is reached.
+By default the `BFGS` optimizer is used. 
 
+# Arguments 
+* `qaoa::QAOA`: QAOA object 
+* `Γ0::Vector{Float64}`: Vector correponding to the local minimum from which we will construct the particular TS and then **roll down** from.
+
+# Return
+* `result:Dict`. Dictionary with keys being `keys \in [1, pmax]` and values being a `Tuple{Float64, Vector{Float64}}` of cost function value and corresponding parameter.
+"""
 function fourierOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int)
     listMinima = Dict{Int64, Tuple{Float64, Vector{Float64}}}()
     p = length(Γ0) ÷ 2 

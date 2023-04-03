@@ -2,11 +2,11 @@
     interpInitialization(Γp::Vector{Float64})
 
 Given an initial state `Γp::Vector{Float64}` of length `2p` it creates another vector
-`ΓInterp` of size `2p+2` with γ (β) components given by the following expression \\
+`ΓInterp` of size ``2p+2`` with ``\gamma (\beta)`` components given by the following expression
 
-``
+```math
 \gamma^i_{p+1} = \frac{i-1}{p} \gamma^{i-1}_{p} + \frac{p-i+1}{p}\gamma^{i}_{p}
-``
+```
 """
 function interpInitialization(Γ::Vector{Float64})
     p = length(Γ) ÷ 2
@@ -39,14 +39,27 @@ algorithm using the `optim=Val(:BFGS)` optimizer (otherwise `optim=Val(:GD)`)
 function rollDownInterp(qaoa::QAOA, Γmin::Vector{Float64}; optim = Val(:BFGS))
     ΓInterp = interpInitialization(Γmin)
 
-    Γmin_interp, Emin_interp = train!(optim, qaoa, ΓInterp; printout = false);
+    Γmin_interp, Emin_interp = optimizeParameters(optim, qaoa, ΓInterp; printout = false);
     return Γmin_interp, Emin_interp
 end
 
+@doc raw"""
+    interpOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int; optim = Val(:BFGS))
+    
+Starting from a local minima `Γ0` at ``p=1`` it performs the `Interp` optimization strategy until the circuit depth `pmax` is reached.
+By default the `BFGS` optimizer is used. 
+
+# Arguments 
+* `qaoa::QAOA`: QAOA object 
+* `Γ0::Vector{Float64}`: Vector correponding to the local minimum from which we will construct the particular TS and then **roll down** from.
+
+# Return
+* `result:Dict`. Dictionary with keys being `keys \in [1, pmax]` and values being a `Tuple{Float64, Vector{Float64}}` of cost function value and corresponding parameter.
+"""
 function interpOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int; optim = Val(:BFGS))
     listMinima = Dict{Int64, Tuple{Float64, Vector{Float64}}}()
     p = length(Γ0) ÷ 2 
-    Γmin, Emin = train!(optim, qaoa, Γ0; printout = false)
+    Γmin, Emin = optimizeParameters(optim, qaoa, Γ0; printout = false)
     listMinima[p] = (Emin, Γmin)
 
     println("Circuit depth  | Energy    | gradient norm ")

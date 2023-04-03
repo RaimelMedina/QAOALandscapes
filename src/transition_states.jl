@@ -33,9 +33,9 @@ end
 @doc raw"""
     toFundamentalRegion!(Γ::Vector{Float64})
 
-Implements the symmetries of the QAOA for the case of the MAXCUT problem on unweighted 3-regular
-graphs. More specifically, one gets that the resulting vector has its γᵢ, βᵢ components in the interval
-[-π/4, π/4] ∀ i ∈ [p], except γ₁ ∈ [0, π/4]. This function modifies inplace the initial input vector `Γ`. 
+Implements the symmetries of the QAOA for the case of the MaxCut problem on unweighted 3-regular
+graphs. More specifically, one gets that the resulting vector has its ``\gamma_i, \beta_i`` components in the interval
+``[-\pi/4, \pi/4] \forall i \in [p]``, except ``\gamma_1 \in [0, \pi/4]``. This function modifies inplace the initial input vector `Γ`. 
 """
 function toFundamentalRegion!(qaoa::QAOA, Γ::Vector{Float64})
     p = length(Γ) ÷ 2
@@ -92,9 +92,11 @@ end
 Starting from a local minima we construct a vector corresponding to the transition state specified by `ig`. From there we construct
 two new vectors 
 
-``
-\Gamma^0_p = \Gamma_{\rm{TS}} + \epsilon \hat{e}_{\rm{min}}, \Gamma^0_m = \Gamma_{\rm{TS}} - \epsilon \hat{e}_{\rm{min}} 
-``
+```math
+\Gamma^0_p = \Gamma_{\rm{TS}} + \epsilon \hat{e}_{\rm{min}}, 
+
+\Gamma^0_m = \Gamma_{\rm{TS}} - \epsilon \hat{e}_{\rm{min}} 
+```
 We then use these two vectors as initial points to carry out the optimization. Following our analytical results we are guarantee
 that the obtained vectors have lower energy than the initial vector `Γmin`
 
@@ -115,8 +117,8 @@ function rollDownTS(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; ϵ=0.001, tsTyp
     Γ0_p = ΓTs + ϵ*result["eigvec_approx"]
     Γ0_m = ΓTs - ϵ*result["eigvec_approx"]
     
-    Γmin_p, Emin_p = train!(optim, qaoa, Γ0_p; printout = false);
-    Γmin_m, Emin_m = train!(optim, qaoa, Γ0_m; printout = false);
+    Γmin_p, Emin_p = optimizeParameters(optim, qaoa, Γ0_p; printout = false);
+    Γmin_m, Emin_m = optimizeParameters(optim, qaoa, Γ0_m; printout = false);
     
     return [Γmin_m, Γmin_p, [Emin_m, Emin_p]]
 end
@@ -127,9 +129,12 @@ end
 Starting from a local minima we construct all transition states (a total of 2p+1 of them). From each of the transition states, we construct
 two new vectors 
 
-``
-\Gamma^0_p = \Gamma_{\rm{TS}} + \epsilon \hat{e}_{\rm{min}}, \Gamma^0_m = \Gamma_{\rm{TS}} - \epsilon \hat{e}_{\rm{min}} 
-``
+```math
+\Gamma^0_p = \Gamma_{\rm{TS}} + \epsilon \hat{e}_{\rm{min}}, 
+
+\Gamma^0_m = \Gamma_{\rm{TS}} - \epsilon \hat{e}_{\rm{min}} 
+```
+
 We then use these two vectors as initial points to carry out the optimization. Following our analytical results we are guarantee
 that the obtained vectors have lower energy than the initial vector `Γmin`
 
@@ -198,8 +203,8 @@ function rollDownWithCurvature(qaoa::QAOA, Γmin::Vector{Float64}; ϵ=0.001, opt
     Γ0_p = ΓTs + ϵ*dictOfTS[keyMinimum]["eigvec_approx"]
     Γ0_m = ΓTs - ϵ*dictOfTS[keyMinimum]["eigvec_approx"]
 
-    Γmin_p, Emin_p  = train!(optim, qaoa, Γ0_p; printout = false);
-    Γmin_m, Emin_m  = train!(optim, qaoa, Γ0_m; printout = false);
+    Γmin_p, Emin_p  = optimizeParameters(optim, qaoa, Γ0_p; printout = false);
+    Γmin_m, Emin_m  = optimizeParameters(optim, qaoa, Γ0_m; printout = false);
     
     vectorE = [Emin_m, Emin_p]
     if chooseSmooth

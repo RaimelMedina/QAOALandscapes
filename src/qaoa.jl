@@ -1,6 +1,6 @@
 @doc raw"""
     QAOA(N::Int, graph::Graph, HB::AbstractBlock, HC::AbstractBlock)
-    QAOA(N::Int, graph::Graph; applySymmetries = true) = QAOA(N, graph, Hx_diag_symmetric(graph), Hzz_diag_symmetric(graph))
+    QAOA(N::Int, graph::Graph; applySymmetries = true) = QAOA(N, graph, HxDiagSymmetric(graph), HzzDiagSymmetric(graph))
 
 Constructor for the `QAOA` object.
 """
@@ -30,8 +30,8 @@ end
     HxDiagSymmetric(g::Graph{T})
 
 Construct the mixing Hamiltonian in the positive (+1) parity sector of the Hilbert space. This means that if the system 
-size is N, then `Hx_diag_symmetric` would be a vector of size 2ᴺ⁻¹. This construction, only makes sense if the cost/problem 
-Hamiltonian H₀ is invariant under the action of the parity operator, that is
+size is N, then `HxDiagSymmetric` would be a vector of size ``2^{N-1}``. This construction, only makes sense if the cost/problem 
+Hamiltonian ``H_C`` is invariant under the action of the parity operator, that is
 
 ```math
     [H_C, \prod_{i=1}^N \sigma^x_i] = 0
@@ -54,15 +54,15 @@ function HxDiagSymmetric(g::Graph{T}) where T
 end
 
 @doc raw"""
-    Hzz_diag_symmetric(g::Graph{T})
+    HzzDiagSymmetric(g::Graph{T})
     HzzDiagSymmetric(g::SimpleWeightedGraph{T})
 
 Construct the cost Hamiltonian in the positive (+1) parity sector of the Hilbert space. This means that if the system 
-size is N, then `Hz_diag_symmetric` would be a vector of size 2ᴺ⁻¹. This construction, only makes sense if the cost/problem 
-Hamiltonian H₀ is invariant under the action of the parity operator, that is
+size is N, then `HzzDiagSymmetric` would be a vector of size ``2^{N-1}``. This construction, only makes sense if the cost/problem 
+Hamiltonian ``H_C`` is invariant under the action of the parity operator, that is
 
 ```math
-    [H_C, $\prod_{i=1}^N \sigma^x_i] = 0
+    [H_C, \prod_{i=1}^N \sigma^x_i] = 0
 ```
 """
 function HzzDiagSymmetric(g::Graph{T}) where T
@@ -115,6 +115,14 @@ function getElementMaxCutHam(x::Int, g::Vector{CartesianIndex{2}})
     return ComplexF64(val)
 end
 
+@doc raw"""
+    HzzDiag(g::Graph{T})
+    HzzDiag(g::SimpleWeightedGraph{T})
+
+Construct the cost Hamiltonian. If the cost Hamiltonian is invariant under the parity operator
+``\prod_{i=1}^N \sigma^x_i`` it is better to work in the +1 parity sector of the Hilbert space since
+this is more efficient. In practice, if the system size is ``N``, the corresponding Hamiltonian would be a vector of size ``2^{N-1}``. 
+"""
 function HzzDiag(g::SimpleWeightedGraph{T}) where T
     interactionIndices = findall(!iszero, adjacency_matrix(g))
     N = nv(g)
@@ -138,6 +146,14 @@ function getElementMixingHam(x::Int, N::Int)
     return ComplexF64(val)
 end
 
+@doc raw"""
+    HzzDiag(g::Graph{T})
+    HzzDiag(g::SimpleWeightedGraph{T})
+
+Construct the mixing Hamiltonian. If the cost Hamiltonian is invariant under the parity operator
+``\prod_{i=1}^N \sigma^x_i`` it is better to work in the +1 parity sector of the Hilbert space since
+this is more efficient. In practice, if the system size is $N$, the corresponding Hamiltonianwould be a vector of size ``2^{N-1}``.
+"""
 function HxDiag(g::Graph{T}) where T
     N = nv(g)
 	result = ThreadsX.map(x->getElementMixingHam(x, N), 0:2^N-1)
@@ -145,6 +161,20 @@ function HxDiag(g::Graph{T}) where T
 end
 #####################################################################
 
+@doc raw"""
+    getQAOAState(q::QAOA, Γ::AbstractVector{T}) where T
+
+Construct the QAOA state. More specifically, it returns the state:
+
+```math
+    |\Gamma^p \rangle = U(\Gamma^p) |+\rangle
+```
+with
+```math
+    U(\Gamma^p) = \prod_{l=1}^p e^{-i H_{B} \beta_{2l}} e^{-i H_{C} \gamma_{2l-1}}
+```
+and ``H_B, H_C`` corresponding to the mixing and cost Hamiltonian correspondingly.
+"""
 function getQAOAState(q::QAOA, Γ::AbstractVector{T}) where T
     p = length(Γ) ÷ 2
     
@@ -162,6 +192,16 @@ function getQAOAState(q::QAOA, Γ::AbstractVector{T}) where T
     return ψ
 end
 
+@doc raw"""
+    (q::QAOA)(Γ::AbstractVector{T}) where T
+
+Computes the expectation value of the cost function ``H_C`` in the ``|\Gamma^p \rangle`` state. 
+More specifically, it returns the following real number:
+
+```math
+    E(\Gamma^p) = \langle \Gamma^p |H_C|\Gamma^p \rangle
+```
+"""
 function (q::QAOA)(Γ::AbstractVector{T}) where T
     ψ = getQAOAState(q, Γ)
     return real(ψ' * (q.HC .* ψ))
@@ -205,6 +245,14 @@ function ∂γψ(q::QAOA, Γ::AbstractVector{T}, layer::Int) where T
     return -im*ψ
 end
 
+@doc raw"""
+    gradCostFunction(qaoa::QAOA, Γ::AbstractVector{T}) where T
+
+Computes the cost function gradient at the point ``\Gamma`` in parameter space, that is
+```math
+    \partial_l E(\Gamma^p) = \partial_l (\langle \Gamma^p |)H_C|\Gamma^p \rangle + \langle \Gamma^p |H_C \partial_l(|\Gamma^p \rangle)
+```
+"""
 function gradCostFunction(qaoa::QAOA, Γ::AbstractVector{T}) where T
     p = length(Γ) ÷ 2
     γ = 1:2:2p
@@ -220,6 +268,11 @@ function gradCostFunction(qaoa::QAOA, Γ::AbstractVector{T}) where T
     return gradVector
 end
 
+@doc raw"""
+    hessianCostFunction(qaoa::QAOA, Γ::AbstractVector{T}) where T
+
+Computes the cost function Hessian at the point ``\Gamma`` in parameter space. At the moment, we do it by using the [`FiniteDiff.jl`](https://github.com/JuliaDiff/FiniteDiff.jl)
+"""
 function hessianCostFunction(q::QAOA, θ::AbstractVector{T}) where T
     f(θ) = q(θ)
     matHessian = FiniteDiff.finite_difference_hessian(f, θ)
@@ -227,10 +280,10 @@ function hessianCostFunction(q::QAOA, θ::AbstractVector{T}) where T
 end
 
 @doc raw"""
-    train!(::Val{:GD}, qaoa::QAOA, Γ0::Vector{Float64}; niter=2000, tol=1e-5, printout=false)
+    optimizeParameters(::Val{:GD}, qaoa::QAOA, Γ0::Vector{Float64}; niter=2000, tol=1e-5, printout=false)
 
-Perform optimization of the `fQAOA` using the gradient descent algorithm with the `ADAM`
-optimizer. By default the number of iterations is set to be `niter=1000`. The optimization stops whether
+Perform optimization of the `QAOA` using the gradient descent algorithm with the `ADAM`
+optimizer. By default the number of iterations is set to be `niter=2000`. The optimization stops whenever
 the maximum number of iterations `niter` is reached or if the gradient norm is below the tolerance `tol=1e-5`
 value.
 
@@ -251,7 +304,7 @@ It returns a tuple containing the following information
 * `params::Vector{Float64}`: Optimal parameter obtained
 * `energy_history::Vector{Float64}`: Vector of size `niter` containing the values of the energy after each optimization stage
 """
-function train!(::Val{:GD}, qaoa::QAOA, Γ0::Vector{Float64}; niter=2000, tol=1e-5, printout=false)
+function optimizeParameters(::Val{:GD}, qaoa::QAOA, Γ0::Vector{Float64}; niter=2000, tol=1e-5, printout=false)
     params = copy(Γ0)
     (printout) && println("Begining optimization using ADAM optimizer")
     energy_history = Float64[]
@@ -272,14 +325,14 @@ function train!(::Val{:GD}, qaoa::QAOA, Γ0::Vector{Float64}; niter=2000, tol=1e
 end
 
 @doc raw"""
-    train!(::Val{:BFGS}, qaoa::QAOA, Γ0::Vector{Float64}; tol=1e-5, printout=false)
+    optimizeParameters(::Val{:BFGS}, qaoa::QAOA, Γ0::Vector{Float64}; printout=false)
 
-Perform optimization of the `QAOA` using the gradient descent algorithm with the `L-BFGS`
+Perform optimization of the `QAOA` using the gradient descent algorithm with the `BFGS`
 optimizer. 
 
 # Arguments
 
-* `Val(:BFGS)`: For using the L-BFGS. Alternatively, `Val(:GD)` for using the `ADAM` optimizer
+* `Val(:BFGS)`: For using the BFGS. Alternatively, `Val(:GD)` for using the `ADAM` optimizer
 * `qaoa:QAOA`: QAOA object
 * `Γ0::Vector{Float64}`: Initial point from where the optimization starts
 
@@ -291,9 +344,8 @@ optimizer.
 It returns a tuple containing the following information
 * `parameters::Vector{Float64}`: Optimal parameter obtained
 * `cost::Float64`: Value of the cost function for the optimal parameter obtained.
-* `info::Symbol`: Usually we get `:SUCCESS` if the optimization was successful. Otherwise, the message is different depending on the problem encountered by the algorithm
 """
-function train!(::Val{:BFGS}, qaoa::QAOA, params::Vector{Float64}; printout=false)
+function optimizeParameters(::Val{:BFGS}, qaoa::QAOA, params::Vector{Float64}; printout=false)
     
     (printout) && println("Begining optimization using BFGS optimizer")
     f(x::Vector{Float64}) = qaoa(x)
@@ -316,15 +368,15 @@ end
 
 
 @doc raw"""
-    train!(::Val{:Fourier}, qaoa::QAOA, Γ0::Vector{Float64}; printout=false)
+    optimizeParameters(::Val{:Fourier}, qaoa::QAOA, Γ0::Vector{Float64}; printout=false)
 
-Perform optimization of the `QAOA` using the gradient descent algorithm with the `L-BFGS`
+Perform optimization of the `QAOA` using the gradient descent algorithm with the `BFGS`
 optimizer. Here we use the alternative "Fourier" initialization, where instead of optimizing the usual (γ, β) parameters
-we optimize their frecuency components (uγ, uβ).
+we optimize their frecuency components ``(u_{\gamma}, u_{\beta})``.
 
 # Arguments
 
-* `Val(:BFGS)`: For using the L-BFGS. Alternatively, `Val(:GD)` for using the `ADAM` optimizer
+* `Val(:BFGS)`: For using the BFGS. Alternatively, `Val(:GD)` for using the `ADAM` optimizer
 * `qaoa:QAOA`: QAOA object
 * `Γ0::Vector{Float64}`: Initial point from where the optimization starts
 
@@ -336,9 +388,8 @@ we optimize their frecuency components (uγ, uβ).
 It returns a tuple containing the following information
 * `parameters::Vector{Float64}`: Optimal parameter obtained
 * `cost::Float64`: Value of the cost function for the optimal parameter obtained.
-* `info::Symbol`: Usually we get `:SUCCESS` if the optimization was successful. Otherwise, the message is different depending on the problem encountered by the algorithm
 """
-function train!(::Val{:Fourier}, qaoa::QAOA, params::Vector{Float64}; printout=false)
+function optimizeParameters(::Val{:Fourier}, qaoa::QAOA, params::Vector{Float64}; printout=false)
     (printout) && println("Begining optimization using BFGS optimizer")
 
     f(x::Vector{Float64})  = qaoa(fromFourierParams(x))
@@ -391,6 +442,18 @@ function quantumFisherInfoMatrix(q::QAOA, θ::Vector{Float64})
     return 4.0*real(fisherMat)
 end
 
+@doc raw"""
+    getInitParameter(qaoa::QAOA; spacing = 0.01, gradTol = 1e-6)
+
+Given a `QAOA` object it performs a grid search on a region of the two dimensional space spanned by ``\{ \gamma_1, \beta_1\}``
+The ``\beta_1`` component is in the interval ``[-\pi/4, \pi/4]`` while the ``\gamma_1`` part is in the ``(0, \pi/4]`` for 3RRG
+or ``(0, \pi/2]`` for dRRG (with ``d\neq 3``). 
+
+We then launch the `QAOA` optimization procedure from the point in the 2-dimensional grid with the smallest cost function value.
+
+# Returns
+* 3-Tuple containing: 1.) the cost function grid, 2.) the optimal parameter, and 3.) the optimal energy
+"""
 function getInitParameter(qaoa::QAOA; spacing = 0.01, gradTol = 1e-6)
     δ = spacing
     βIndex  = collect(-π/4:δ:π/4)

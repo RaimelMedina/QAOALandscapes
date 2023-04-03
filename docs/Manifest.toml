@@ -643,7 +643,7 @@ uuid = "33c8b6b6-d38a-422a-b730-caa89a2f386c"
 version = "0.1.4"
 
 [[deps.QAOALandscapes]]
-deps = ["Documenter", "DocumenterMarkdown", "FLoops", "FiniteDiff", "Flux", "Graphs", "LineSearches", "LinearAlgebra", "Optim", "SimpleWeightedGraphs", "Statistics", "ThreadsX", "Yao"]
+deps = ["Documenter", "DocumenterMarkdown", "FLoops", "FiniteDiff", "Flux", "ForwardDiff", "Graphs", "LineSearches", "LinearAlgebra", "Optim", "SimpleWeightedGraphs", "Statistics", "ThreadsX", "Yao"]
 path = "/Users/raimelalbertomedinaramos/.julia/dev/QAOALandscapes"
 uuid = "ccb4373d-55c9-4771-9d60-04573b2abef6"
 version = "1.0.0-DEV"

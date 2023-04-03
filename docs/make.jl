@@ -15,7 +15,8 @@ makedocs(;
         assets=String[],
     ),
     pages=[
-        "Home" => "index.md",
+        "QAOALandscapes" => "index.md",
+        "api.md"
     ],
 )
 

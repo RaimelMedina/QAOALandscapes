@@ -20,6 +20,9 @@ function ifwht(a::Vector{T}) where T
     return fwht(a) / length(a)
 end
 
+getWeight(edge::T) where T<:Graphs.SimpleGraphs.SimpleEdge = 1.0
+getWeight(edge::T) where T<:SimpleWeightedEdge = edge.weight
+
 function gradStdTest(v::Vector{Float64})
     dim = length(v)
     Δβ = v[2:2:dim] |> diff

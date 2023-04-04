@@ -1,21 +1,28 @@
 @doc raw"""
-    QAOA(N::Int, graph::Graph, HB::AbstractBlock, HC::AbstractBlock)
-    QAOA(N::Int, graph::Graph; applySymmetries = true) = QAOA(N, graph, HxDiagSymmetric(graph), HzzDiagSymmetric(graph))
+```julia
+    struct QAOA{T1 <: AbstractGraph, T2}
+        N::Int
+        graph::T1
+        HB::AbstractVector{T2}
+        HC::AbstractVector{T2}
+    end
+```
+    QAOA(N::Int, graph::T; applySymmetries = true) where T<:AbstractGraph = QAOA{T, Float64}(N, graph, HxDiagSymmetric(graph), HzzDiagSymmetric(graph))
 
 Constructor for the `QAOA` object.
 """
-struct QAOA{T}
+struct QAOA{T1 <: AbstractGraph, T2}
     N::Int
-    graph::Graph
-    HB::AbstractVector{T}
-    HC::AbstractVector{T}
+    graph::T1
+    HB::AbstractVector{T2}
+    HC::AbstractVector{T2}
 end
 
-function QAOA(N::Int, g::Graph; applySymmetries=true)
+function QAOA(N::Int, g::T; applySymmetries=true) where T <: AbstractGraph
     if applySymmetries==false
-        QAOA(N, g, HxDiag(g), HzzDiag(g))
+        QAOA{T, Float64}(N, g, HxDiag(g), HzzDiag(g))
     else
-        QAOA(N-1, g, HxDiagSymmetric(g), HzzDiagSymmetric(g)) 
+        QAOA{T, Float64}(N-1, g, HxDiagSymmetric(g), HzzDiagSymmetric(g)) 
     end
 end
 
@@ -27,7 +34,7 @@ function Base.show(io::IO, qaoa::QAOA)
 end
 
 @doc raw"""
-    HxDiagSymmetric(g::Graph{T})
+    HxDiagSymmetric(g::T) where T<: AbstractGraph
 
 Construct the mixing Hamiltonian in the positive (+1) parity sector of the Hilbert space. This means that if the system 
 size is N, then `HxDiagSymmetric` would be a vector of size ``2^{N-1}``. This construction, only makes sense if the cost/problem 
@@ -37,7 +44,7 @@ Hamiltonian ``H_C`` is invariant under the action of the parity operator, that i
     [H_C, \prod_{i=1}^N \sigma^x_i] = 0
 ```
 """
-function HxDiagSymmetric(g::Graph{T}) where T
+function HxDiagSymmetric(g::T) where T<: AbstractGraph
     N = nv(g)
     Hx_vec = zeros(ComplexF64, 2^(N-1))
     count = 0
@@ -54,8 +61,7 @@ function HxDiagSymmetric(g::Graph{T}) where T
 end
 
 @doc raw"""
-    HzzDiagSymmetric(g::Graph{T})
-    HzzDiagSymmetric(g::SimpleWeightedGraph{T})
+    HzzDiagSymmetric(g::T) where T <: AbstractGraph
 
 Construct the cost Hamiltonian in the positive (+1) parity sector of the Hilbert space. This means that if the system 
 size is N, then `HzzDiagSymmetric` would be a vector of size ``2^{N-1}``. This construction, only makes sense if the cost/problem 
@@ -65,25 +71,12 @@ Hamiltonian ``H_C`` is invariant under the action of the parity operator, that i
     [H_C, \prod_{i=1}^N \sigma^x_i] = 0
 ```
 """
-function HzzDiagSymmetric(g::Graph{T}) where T
+function HzzDiagSymmetric(g::T) where T <: AbstractGraph
     N = nv(g)
-    edgeList = findall(!iszero, adjacency_matrix(g))
     matZZ = zeros(ComplexF64, 2^(N-1));
-    for i ∈ edgeList
+    for edge ∈ edges(g)
         for j ∈ 0:2^(N-1)-1
-            matZZ[j+1] += ComplexF64(-2 * (((j >> (i[1] -1)) & 1) ⊻ ((j >> (i[2] -1)) & 1)) + 1)
-        end
-    end
-    return matZZ/2
-end
-
-function HzzDiagSymmetric(g::SimpleWeightedGraph{T}) where T
-    N = nv(g)
-    edgeList = findall(!iszero, adjacency_matrix(g))
-    matZZ = zeros(ComplexF64, 2^(N-1));
-    for i ∈ edgeList
-        for j ∈ 0:2^(N-1)-1
-            matZZ[j+1] += ComplexF64(-2 * (((j >> (i[1] -1)) & 1) ⊻ ((j >> (i[2] -1)) & 1)) + 1) * get_weight(g, i[1], i[2])
+            matZZ[j+1] += ComplexF64(-2 * (((j >> (edge.src -1)) & 1) ⊻ ((j >> (edge.dst -1)) & 1)) + 1) * getWeight(edge)
         end
     end
     return matZZ/2
@@ -91,72 +84,49 @@ end
 
 #####################################################################
 
-function getElementMaxCutHam(x::Int, g::Vector{CartesianIndex{2}}, graph::SimpleWeightedGraph)
+function getElementMaxCutHam(x::Int, graph::T) where T <: AbstractGraph
     val = 0.
-    N = length(g)
-    for i=1:N
-        i_elem = ((x>>(g[i][1]-1))&1)
-        j_elem = ((x>>(g[i][2]-1))&1)
+    for i ∈ edges(graph)
+        i_elem = ((x>>(i.src-1))&1)
+        j_elem = ((x>>(i.dst-1))&1)
         idx = i_elem ⊻ j_elem
-        val += ((-1)^idx)*get_weight(graph, g[i][1], g[i][2])
+        val += ((-1)^idx)*getWeight(i)
     end
-    return ComplexF64(val)
-end
-
-function getElementMaxCutHam(x::Int, g::Vector{CartesianIndex{2}})
-    val = 0.
-    N = length(g)
-    for i=1:N
-        i_elem = ((x>>(g[i][1]-1))&1)
-        j_elem = ((x>>(g[i][2]-1))&1)
-        idx = i_elem ⊻ j_elem
-        val += ((-1)^idx)
-    end
-    return ComplexF64(val)
+    return val
 end
 
 @doc raw"""
-    HzzDiag(g::Graph{T})
-    HzzDiag(g::SimpleWeightedGraph{T})
+    HzzDiag(g::T) where T <: AbstractGraph
 
 Construct the cost Hamiltonian. If the cost Hamiltonian is invariant under the parity operator
 ``\prod_{i=1}^N \sigma^x_i`` it is better to work in the +1 parity sector of the Hilbert space since
-this is more efficient. In practice, if the system size is ``N``, the corresponding Hamiltonian would be a vector of size ``2^{N-1}``. 
+this is more efficient. In practice, if the system size is ``N``, the corresponding Hamiltonian would be a vector of size ``2^{N-1}``.
+This function instead returs a vector of size ``2^N``. 
 """
-function HzzDiag(g::SimpleWeightedGraph{T}) where T
-    interactionIndices = findall(!iszero, adjacency_matrix(g))
-    N = nv(g)
-	result = ThreadsX.map(x->getElementMaxCutHam(x, interactionIndices, g), 0:2^N-1)
+function HzzDiag(g::T) where T <: AbstractGraph
+    result = ThreadsX.map(x->getElementMaxCutHam(x, g), 0:2^N-1)
 	return result/2
 end
 
-function HzzDiag(g::Graph{T}) where T
-    interactionIndices = findall(!iszero, adjacency_matrix(g))
-    N = nv(g)
-	result = ThreadsX.map(x->getElementMaxCutHam(x, interactionIndices), 0:2^N-1)
-	return result/2
-end
-
-function getElementMixingHam(x::Int, N::Int)
+function getElementMixingHam(x::Int, graph::T) where T <: AbstractGraph
     val = 0.
+    N   = nv(graph)
     for i=1:N
         i_elem = ((x>>(i-1))&1)
         val += (-1)^i_elem
     end
-    return ComplexF64(val)
+    return val
 end
 
 @doc raw"""
-    HzzDiag(g::Graph{T})
-    HzzDiag(g::SimpleWeightedGraph{T})
+    HzzDiag(g::T) where T<: AbstractGraph
 
 Construct the mixing Hamiltonian. If the cost Hamiltonian is invariant under the parity operator
 ``\prod_{i=1}^N \sigma^x_i`` it is better to work in the +1 parity sector of the Hilbert space since
 this is more efficient. In practice, if the system size is $N$, the corresponding Hamiltonianwould be a vector of size ``2^{N-1}``.
 """
-function HxDiag(g::Graph{T}) where T
-    N = nv(g)
-	result = ThreadsX.map(x->getElementMixingHam(x, N), 0:2^N-1)
+function HxDiag(g::T) where T <: AbstractGraph
+    result = ThreadsX.map(x->getElementMixingHam(x, g), 0:2^N-1)
 	return result
 end
 #####################################################################
@@ -202,12 +172,12 @@ More specifically, it returns the following real number:
     E(\Gamma^p) = \langle \Gamma^p |H_C|\Gamma^p \rangle
 ```
 """
-function (q::QAOA)(Γ::AbstractVector{T}) where T
+function (q::QAOA)(Γ::T) where T <: AbstractVector
     ψ = getQAOAState(q, Γ)
     return real(ψ' * (q.HC .* ψ))
 end
 
-function ∂βψ(q::QAOA, Γ::AbstractVector{T}, layer::Int) where T
+function ∂βψ(q::QAOA, Γ::T, layer::Int) where T <: AbstractVector
     p = length(Γ) ÷ 2
     γ = Γ[1:2:2p]
     β = Γ[2:2:2p]
@@ -226,7 +196,7 @@ function ∂βψ(q::QAOA, Γ::AbstractVector{T}, layer::Int) where T
     return -im*ψ
 end
 
-function ∂γψ(q::QAOA, Γ::AbstractVector{T}, layer::Int) where T
+function ∂γψ(q::QAOA, Γ::T, layer::Int) where T <: AbstractVector
     p = length(Γ) ÷ 2
     γ = Γ[1:2:2p]
     β = Γ[2:2:2p]
@@ -253,7 +223,7 @@ Computes the cost function gradient at the point ``\Gamma`` in parameter space, 
     \partial_l E(\Gamma^p) = \partial_l (\langle \Gamma^p |)H_C|\Gamma^p \rangle + \langle \Gamma^p |H_C \partial_l(|\Gamma^p \rangle)
 ```
 """
-function gradCostFunction(qaoa::QAOA, Γ::AbstractVector{T}) where T
+function gradCostFunction(qaoa::QAOA, Γ::T) where T <: AbstractVector
     p = length(Γ) ÷ 2
     γ = 1:2:2p
     β = 2:2:2p
@@ -273,7 +243,7 @@ end
 
 Computes the cost function Hessian at the point ``\Gamma`` in parameter space. At the moment, we do it by using the [`FiniteDiff.jl`](https://github.com/JuliaDiff/FiniteDiff.jl)
 """
-function hessianCostFunction(q::QAOA, θ::AbstractVector{T}) where T
+function hessianCostFunction(q::QAOA, θ::T) where T <: AbstractVector
     f(θ) = q(θ)
     matHessian = FiniteDiff.finite_difference_hessian(f, θ)
     return matHessian
@@ -411,13 +381,13 @@ function optimizeParameters(::Val{:Fourier}, qaoa::QAOA, params::Vector{Float64}
 end
 
 @doc raw"""
-    getStateJacobian(q::QAOA, θ::Vector)
+    getStateJacobian(q::QAOA, θ::T) where T <: AbstractVector
 
 Returns the jacobian ``\nabla |\psi\rangle \in M(\mathbb{C}, 2^N \times 2p)``, where ``N`` corresponds to the total 
 number of qubits and ``2p`` is the number of paramaters in ``|\psi(\theta)\rangle``. 
 """
-function getStateJacobian(q::QAOA, θ::Vector{Float64})
-    f(x::Vector) = getQAOAState(q, x)
+function getStateJacobian(q::QAOA, θ::T) where T <: AbstractVector
+    f(x) = getQAOAState(q, x)
     matJacobian = FiniteDiff.finite_difference_jacobian(f, ComplexF64.(θ))
     return matJacobian
 end
@@ -432,7 +402,7 @@ Constructs the Quantum Fisher Information matrix, defined as follows
 \mathcal{F}_{ij} = 4 \mathop{\rm{Re}}[\langle \partial_i \psi| \partial_j \psi\rangle - \langle \partial_i \psi| \psi\rangle \langle \psi|\partial_j \psi\rangle ]
 ``
 """
-function quantumFisherInfoMatrix(q::QAOA, θ::Vector{Float64})
+function quantumFisherInfoMatrix(q::QAOA, θ::T) where T <: AbstractVector
     ∇ψ = getStateJacobian(q, θ)
     ψ  = getQAOAState(q, θ)
     w  = ψ' * ∇ψ

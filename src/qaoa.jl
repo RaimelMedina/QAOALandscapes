@@ -145,7 +145,7 @@ with
 ```
 and ``H_B, H_C`` corresponding to the mixing and cost Hamiltonian correspondingly.
 """
-function getQAOAState(q::QAOA, Γ::AbstractVector{T}) where T
+function getQAOAState(q::QAOA, Γ::T) where T <: AbstractVector
     p = length(Γ) ÷ 2
     
     γ = Γ[1:2:2p]
@@ -163,7 +163,7 @@ function getQAOAState(q::QAOA, Γ::AbstractVector{T}) where T
 end
 
 @doc raw"""
-    (q::QAOA)(Γ::AbstractVector{T}) where T
+    (q::QAOA)(Γ::T) where T <: AbstractVector
 
 Computes the expectation value of the cost function ``H_C`` in the ``|\Gamma^p \rangle`` state. 
 More specifically, it returns the following real number:

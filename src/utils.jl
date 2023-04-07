@@ -1,4 +1,4 @@
-function fwht(a::Vector{T}) where T
+function fwht(a::T) where T <: AbstractVector
     h   = 1
     dim = length(a) 
     tmp = copy(a)
@@ -16,7 +16,7 @@ function fwht(a::Vector{T}) where T
     return tmp
 end
 
-function ifwht(a::Vector{T}) where T
+function ifwht(a::T) where T <: AbstractVector
     return fwht(a) / length(a)
 end
 
@@ -79,9 +79,6 @@ function parity_of_integer(x::Integer)
     parity
 end
 
-function isdRegularGraph(g::Graph, d::Int)
-    adjMat     = adjacency_matrix(g)
-    regularity = map(x->length(findall(!iszero, x)), eachcol(adjMat))
-    boolVector = regularity .== d
-    return boolVector==ones(size(adjMat)[1])
+function isdRegularGraph(g::T, d::Int) where T <: AbstractGraph
+    return reduce(*, degree(g) .== d)
 end

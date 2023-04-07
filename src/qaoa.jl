@@ -79,7 +79,7 @@ function HzzDiagSymmetric(g::T) where T <: AbstractGraph
             matZZ[j+1] += ComplexF64(-2 * (((j >> (edge.src -1)) & 1) ⊻ ((j >> (edge.dst -1)) & 1)) + 1) * getWeight(edge)
         end
     end
-    return matZZ/2
+    return matZZ
 end
 
 #####################################################################
@@ -151,8 +151,8 @@ function getQAOAState(q::QAOA, Γ::T) where T <: AbstractVector
     γ = Γ[1:2:2p]
     β = Γ[2:2:2p]
 
-    ψ = state(uniform_state(q.N))[:]
-    
+    ψ = (2^(-q.N/2))*ones(eltype(Γ .+ im*0.), 2^q.N)
+
     for i ∈ 1:p
         ψ .= exp.(-im * γ[i] * q.HC) .* ψ
         ψ .= fwht(ψ)              # Fast Hadamard transformation
@@ -230,7 +230,7 @@ function gradCostFunction(qaoa::QAOA, Γ::T) where T <: AbstractVector
 
     ψ = getQAOAState(qaoa, Γ)
     
-    gradVector = zeros(Float64, length(Γ))
+    gradVector = zeros(eltype(Γ), length(Γ))
     for i ∈ 1:p
         gradVector[γ[i]]  = 2.0*real(∂γψ(qaoa, Γ, i)' * (qaoa.HC .* ψ))
         gradVector[β[i]]  = 2.0*real(∂βψ(qaoa, Γ, i)' * (qaoa.HC .* ψ))
@@ -428,7 +428,7 @@ function getInitParameter(qaoa::QAOA; spacing = 0.01, gradTol = 1e-6)
     δ = spacing
     βIndex  = collect(-π/4:δ:π/4)
     
-    if VQALandscapes.isdRegularGraph(qaoa.graph, 3)
+    if  isdRegularGraph(qaoa.graph, 3)
         γIndex  = collect(0.0:(spacing/2):π/4)
     else
         δ = 0.03
@@ -446,7 +446,7 @@ function getInitParameter(qaoa::QAOA; spacing = 0.01, gradTol = 1e-6)
 
     gradNormGridMin = norm(gradCostFunction(qaoa, Γ))
     if gradNormGridMin > gradTol
-        newParams, newEnergy = train!(Val(:BFGS), qaoa, Γ)
+        newParams, newEnergy = optimizeParameters(Val(:BFGS), qaoa, Γ)
         println("Convergence reached. Energy = $(newEnergy), |∇E| = $(norm(gradCostFunction(qaoa, newParams)))")
     end
     return energy, newParams, newEnergy

@@ -112,7 +112,7 @@ that the obtained vectors have lower energy than the initial vector `Γmin`
 """
 function rollDownTS(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; ϵ=0.001, tsType="symmetric", optim=Val(:BFGS))
     ΓTs = transitionState(Γmin, ig, tsType=tsType)
-    result = index1Direction(qaoa, Γmin, ig, tsType=tsType)
+    result = getNegativeHessianEigvec(qaoa, Γmin, ig, tsType=tsType)
     
     Γ0_p = ΓTs + ϵ*result["eigvec_approx"]
     Γ0_m = ΓTs - ϵ*result["eigvec_approx"]
@@ -184,10 +184,10 @@ function rollDownWithCurvature(qaoa::QAOA, Γmin::Vector{Float64}; ϵ=0.001, opt
 
 
     for x in 1:p+1
-        setindex!(dictOfTS, index1Direction(qaoa, Γmin, x, tsType="symmetric"), string((x,x)))
+        setindex!(dictOfTS, getNegativeHessianEigvec(qaoa, Γmin, x, tsType="symmetric"), string((x,x)))
     end
     for x in 2:p+1
-        setindex!(dictOfTS, index1Direction(qaoa, Γmin, x, tsType="non_symmetric"), string((x,x-1)))
+        setindex!(dictOfTS, getNegativeHessianEigvec(qaoa, Γmin, x, tsType="non_symmetric"), string((x,x-1)))
     end
 
     dictOfTSCurvature = Dict{String, Float64}()

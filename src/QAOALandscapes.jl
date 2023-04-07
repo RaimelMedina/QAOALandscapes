@@ -11,7 +11,7 @@ export interpInitialization, rollDownInterp, interpOptimize
 # Fourier
 export toFourierParams, fromFourierParams, fourierInitialization, fourierJacobian, rollDownFourier, fourierOptimize
 # Transition states
-export transitionState, permuteHessian, getNegativeHessEigval, index1Direction, rollDownTS, greedyOptimize, greedySelect
+export transitionState, permuteHessian, getNegativeHessianEigval, getNegativeHessianEigvec, rollDownTS, greedyOptimize, greedySelect
 
 # Some useful Functions
 export spinChain
@@ -36,4 +36,6 @@ include("greedy_ts.jl")
 include("interp.jl")
 include("fourier.jl")
 include("utils.jl")
+
+
 end

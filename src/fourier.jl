@@ -57,7 +57,7 @@ end
 function rollDownFourier(qaoa::QAOA, Γmin::Vector{Float64})
     ΓFourier = toFourierParams(fourierInitialization(Γmin))
 
-    Γmin_fourier, Emin_fourier = train!(Val(:Fourier), qaoa, ΓFourier; printout = false);
+    Γmin_fourier, Emin_fourier = optimizeParameters(Val(:Fourier), qaoa, ΓFourier; printout = false);
     return Γmin_fourier, Emin_fourier
 end
 
@@ -77,7 +77,7 @@ By default the `BFGS` optimizer is used.
 function fourierOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int)
     listMinima = Dict{Int64, Tuple{Float64, Vector{Float64}}}()
     p = length(Γ0) ÷ 2 
-    Γmin, Emin = train!(Val(:BFGS), qaoa, Γ0; printout = false)
+    Γmin, Emin = optimizeParameters(Val(:BFGS), qaoa, Γ0; printout = false)
     listMinima[p] = (Emin, Γmin)
 
     println("Circuit depth  | Energy    | gradient norm ")

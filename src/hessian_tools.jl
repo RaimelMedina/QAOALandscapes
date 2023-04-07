@@ -24,14 +24,14 @@ function elementHessianCostFunction(qaoa::QAOA, Γ::Vector{Float64}, idx::Vector
 end
 
 @doc raw"""
-    getNegativeHessEigvalssianEigval(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric", ϵ=cbrt(eps(Float64)))
+    getNegativeHessianEigval(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric", ϵ=cbrt(eps(Float64)))
 
 Computes the approximation to the minimum (negative) eigenvalue of the Hessian at the TS obtained by padding with zeros
 the local minimum `Γmin`. The transition state is completely specified by the index of the γ component `ig`, and the 
 type of transition states (`"symmetric"` or `"non_symmetric"`). The cost of obtaining this approximate eigenvalue is basically
 the cost of computing two matrix elements of a Hessian.
 """
-function getNegativeHessEigval(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric", ϵ=cbrt(eps(Float64)))
+function getNegativeHessianEigval(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric", ϵ=cbrt(eps(Float64)))
     ΓTs = transitionState(Γmin, ig, tsType=tsType)
     p    = length(Γmin) ÷ 2
     
@@ -116,7 +116,7 @@ function permuteHessian(H::AbstractArray{Float64,2}, i::Int; tsType="symmetric",
 end
 
 @doc raw"""
-    index1Direction(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric", doChecks=false)
+    getNegativeHessianEigvec(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric", doChecks=false)
 
 Computes the approximate eigenvalue and index-1 eigenvector of the Hessian at the transition state obtained from the local minimum 
 `Γmin`. It is completely specified by the parameters `iγ` and `tsType="symmetric"`. If the optional parameter `doChecks=false`
@@ -135,7 +135,7 @@ the approximate and true eigenvector
 # Returns
 * `result::Dict` Dictionary with the following keys: `eigvec_approx`, `eigval_approx`. If `doChecks=true` the following additional keys are available: `change_basis`, `eigvec_fidelity` and `eigval_error`
 """
-function index1Direction(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric", doChecks=false)
+function getNegativeHessianEigvec(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric", doChecks=false)
     p   = length(Γmin) ÷ 2
     dim = 2(p+1)
 
@@ -147,7 +147,7 @@ function index1Direction(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="sy
     vApproximate = zeros(dim)
 
     #now compute the approximation to the eigenvalue :) 
-    b, bbar = getNegativeHessEigvalssianEigval(qaoa, Γmin, ig; tsType=tsType)
+    b, bbar = getNegativeHessianEigval(qaoa, Γmin, ig; tsType=tsType)
     #we use bbar, or more specifically its sign to determine
     #the approximate eigenvector
 

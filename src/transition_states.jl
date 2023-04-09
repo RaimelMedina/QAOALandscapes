@@ -31,30 +31,40 @@ function transitionState(Γ::Vector{Float64}, iγ::Int; tsType="symmetric")
 end
 
 @doc raw"""
-    toFundamentalRegion!(Γ::Vector{Float64})
+    toFundamentalRegion!(qaoa::QAOA, Γ::Vector{Float64})
 
-Implements the symmetries of the QAOA for the case of the MaxCut problem on unweighted 3-regular
-graphs. More specifically, one gets that the resulting vector has its ``\gamma_i, \beta_i`` components in the interval
-``[-\pi/4, \pi/4] \forall i \in [p]``, except ``\gamma_1 \in [0, \pi/4]``. This function modifies inplace the initial input vector `Γ`. 
+Implements the symmetries of the QAOA for different graphs. For more detail see the following [`reference`](https://arxiv.org/abs/2209.01159).
+
+For an arbitrary graph, we can restrict both `\gamma` and `\beta` parameters to the `[-\pi/2, \pi/2]` interval. Furthermore, `\beta` parameters
+can be restricted even further to the `[-\pi/4, \pi/4]` interval (see [`here`](https://journals.aps.org/prx/abstract/10.1103/PhysRevX.10.021067))
+Finally, when dealing with regular graphs with odd degree `\gamma` paramaters can be brought to the `[-\pi/4, \pi/4]` interval.
+This function modifies inplace the initial input vector `Γ`. 
 """
 function toFundamentalRegion!(qaoa::QAOA, Γ::Vector{Float64})
     p = length(Γ) ÷ 2
     β = Γ[2:2:2p]
     γ = Γ[1:2:2p]
     
+    # First, folding β ∈ [-π/4, π/4] and
+    # γ ∈ [-π/2, π/2]
     for i=1:p #beta angles come first, they are between -pi/4, pi/4
         β[i] = mod(β[i], π/2) # folding beta to interval 0, pi/2
-        if β[i] > π/4 # translating it to -pi/4,pi/4 interval
+        if β[i] > π/4 # translating it to -pi/4, pi/4 interval
             β[i] -= π/2
+        end
+        γ[i] = mod(γ[i], π) # processing gammas by folding them to -pi/2, pi/2 interval
+        if γ[i] > π/2
+            γ[i] -= π
         end
     end
 
-    if isdRegularGraph(qaoa.graph, 3)
+    graph_degree = degree(qaoa.graph)
+    if reduce(*, isodd.(graph_degree)) # enter here if each vertex has odd degree. Assuming regular graphs here :| 
         for i=1:p
-            γ[i] = mod(γ[i], π) # processing gammas by folding them to -pi/2, pi/2 interval
-            if γ[i] > π/2
-                γ[i] -= π
-            end
+            # γ[i] = mod(γ[i], π) # processing gammas by folding them to -pi/2, pi/2 interval
+            # if γ[i] > π/2
+            #     γ[i] -= π
+            # end
             if abs(γ[i]) > π/4 # now folding them even more: to -pi/4, pi/4 interval
                 β[i:end] .*= -1 # this requires sign flip of betas!
                 γ[i] -= sign(γ[i])*π/2
@@ -64,24 +74,24 @@ function toFundamentalRegion!(qaoa::QAOA, Γ::Vector{Float64})
                 γ .*= -1
             end
         end
-    elseif isdRegularGraph(qaoa.graph, 2)
-        for i=1:p
-            γ[i] = mod(γ[i], π) # processing gammas by folding them to -pi/2, pi/2 interval
-            if γ[i] > π/2
-                γ[i] -= π
-            end
-            if abs(γ[i]) > π/4 # now folding them even more: to -pi/4, pi/4 interval
-                β[i:end] .*= -1 # this requires sign flip of betas!
-                γ[i] -= sign(γ[i])*π/2
-            end
-            if γ[1] < 0 # making angle gamma_1 positive
-                β .*= -1  # by changing the sign of ALL angles
-                γ .*= -1
-            end
-        end
-    else
     end
-    
+    # elseif isdRegularGraph(qaoa.graph, 2)
+    #     for i=1:p
+    #         γ[i] = mod(γ[i], π) # processing gammas by folding them to -pi/2, pi/2 interval
+    #         if γ[i] > π/2
+    #             γ[i] -= π
+    #         end
+    #         if abs(γ[i]) > π/4 # now folding them even more: to -pi/4, pi/4 interval
+    #             β[i:end] .*= -1 # this requires sign flip of betas!
+    #             γ[i] -= sign(γ[i])*π/2
+    #         end
+    #         if γ[1] < 0 # making angle gamma_1 positive
+    #             β .*= -1  # by changing the sign of ALL angles
+    #             γ .*= -1
+    #         end
+    #     end
+    # else
+
     Γ[2:2:2p] = β;
     Γ[1:2:2p] = γ;
 end
@@ -93,7 +103,7 @@ Starting from a local minima we construct a vector corresponding to the transiti
 two new vectors 
 
 ```math
-\Gamma^0_p = \Gamma_{\rm{TS}} + \epsilon \hat{e}_{\rm{min}}, 
+\Gamma^0_p = \Gamma_{\rm{TS}} + \epsilon \hat{e}_{\rm{min}}, \n
 
 \Gamma^0_m = \Gamma_{\rm{TS}} - \epsilon \hat{e}_{\rm{min}} 
 ```
@@ -149,8 +159,8 @@ function rollDownTS(qaoa::QAOA, Γmin::Vector{Float64}; ϵ=0.001, optim=Val(:BFG
     p                = length(Γmin) ÷ 2
     parametersResult = Dict{String, Vector{Vector{Float64}}}()  
     energiesResult   = Dict{String, Vector{Float64}}()
-
     dictSymmetricTS  = Dict{String, Vector{Vector{Float64}}}()
+    
     if threaded
         ThreadsX.map(x->dictSymmetricTS[string((x,x))]   = rollDownTS(qaoa, Γmin, x; ϵ=ϵ, tsType="symmetric", optim=optim), 1:p+1)
         ThreadsX.map(x->dictSymmetricTS[string((x,x-1))] = rollDownTS(qaoa, Γmin, x; ϵ=ϵ, tsType="non_symmetric", optim=optim), 2:p+1)
@@ -163,10 +173,12 @@ function rollDownTS(qaoa::QAOA, Γmin::Vector{Float64}; ϵ=0.001, optim=Val(:BFG
             end
         end
     end
+    
     for k in keys(dictSymmetricTS)
         parametersResult[k] = dictSymmetricTS[k][1:2]
         energiesResult[k]   = dictSymmetricTS[k][3]
     end
+    
     if (chooseSmooth && p>3)
         for k in keys(dictSymmetricTS)
             smoothParams = selectSmoothParameter(parametersResult[k])
@@ -175,45 +187,4 @@ function rollDownTS(qaoa::QAOA, Γmin::Vector{Float64}; ϵ=0.001, optim=Val(:BFG
         end
     end
     return parametersResult, energiesResult
-end
-
-function rollDownWithCurvature(qaoa::QAOA, Γmin::Vector{Float64}; ϵ=0.001, optim=Val(:BFGS), chooseSmooth=false)
-    p = length(Γmin) ÷ 2
-
-    dictOfTS = Dict{String, Any}()
-
-
-    for x in 1:p+1
-        setindex!(dictOfTS, getNegativeHessianEigvec(qaoa, Γmin, x, tsType="symmetric"), string((x,x)))
-    end
-    for x in 2:p+1
-        setindex!(dictOfTS, getNegativeHessianEigvec(qaoa, Γmin, x, tsType="non_symmetric"), string((x,x-1)))
-    end
-
-    dictOfTSCurvature = Dict{String, Float64}()
-    for k in keys(dictOfTS)
-        dictOfTSCurvature[k] = dictOfTS[k]["eigval_approx"]
-    end
-
-    
-    valMinimum, keyMinimum = findmin(dictOfTSCurvature);
-    ig, tsType = whichTSType(keyMinimum)
-    ΓTs = transitionState(Γmin, ig, tsType=tsType);
-    
-    Γ0_p = ΓTs + ϵ*dictOfTS[keyMinimum]["eigvec_approx"]
-    Γ0_m = ΓTs - ϵ*dictOfTS[keyMinimum]["eigvec_approx"]
-
-    Γmin_p, Emin_p  = optimizeParameters(optim, qaoa, Γ0_p; printout = false);
-    Γmin_m, Emin_m  = optimizeParameters(optim, qaoa, Γ0_m; printout = false);
-    
-    vectorE = [Emin_m, Emin_p]
-    if chooseSmooth
-        println("Procceding with the smooth parameter configuration")
-        idx, smoothΓ = selectSmoothParameter([Γmin_m, Γmin_p])
-        return vectorE[idx], smoothΓ
-    else
-        idx     = argmin(vectorE)
-        vectorΓ = [Γmin_m, Γmin_p] 
-        return vectorE[idx], vectorΓ[idx]
-    end
 end

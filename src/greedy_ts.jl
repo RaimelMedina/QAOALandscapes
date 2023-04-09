@@ -51,21 +51,3 @@ function greedyOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int; ϵ=0.001, o
 
     return listMinima
 end
-
-function greedyOptimizeWithCurvature(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int; ϵ=0.001, optim=Val(:BFGS), chooseSmooth=false)
-    listMinima = Dict{Int64, Tuple{Float64, Vector{Float64}}}()
-    p = 1
-    Γmin, Emin = optimizeParameters(optim, qaoa, Γ0; printout = false)
-    listMinima[p] = (Emin, Γmin)
-
-    println("Circuit depth  | Energy    | gradient norm ")
-    println("    p=$(p)     | $(round(Emin, digits = 7)) | $(norm(gradCostFunction(qaoa, Γmin)))")
-
-    for p ∈ 2:pmax
-        Eopt, Γopt = rollDownWithCurvature(qaoa, listMinima[p-1][end]; ϵ=ϵ, optim=optim, chooseSmooth=chooseSmooth)
-        listMinima[p] = (Eopt, Γopt)
-        println("    p=$(p)     | $(round(Eopt, digits = 7)) | $(norm(gradCostFunction(qaoa, Γopt)))")
-    end
-
-    return listMinima
-end

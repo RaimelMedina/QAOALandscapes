@@ -1,7 +1,7 @@
 # QAOALandscapes
 
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://RaimelMedina.github.io/QAOALandscapes.jl/stable/)
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://RaimelMedina.github.io/QAOALandscapes.jl/dev/)
+<!-- [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://raimelmedina.github.io/QAOALandscapes/stable/) -->
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://raimelmedina.github.io/QAOALandscapes/dev/)
 
 This repository contains the code for the QAOA landscape exploration project. Currently, we have implemented three different initialization and optimization strategies:
 

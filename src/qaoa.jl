@@ -1,14 +1,4 @@
 @doc raw"""
-```julia
-    struct QAOA{T1 <: AbstractGraph, T2}
-        N::Int
-        graph::T1
-        HB::AbstractVector{T2}
-        HC::AbstractVector{T2}
-        ψ::AbstractVector{ComplexF64} # needed for the energy and to get the QAOA state
-        ∂ψ::AbstractVector{ComplexF64} # needed for the gradient
-    end
-```
     QAOA(N::Int, graph::T; applySymmetries = true) where T<:AbstractGraph = QAOA{T, Float64}(N, graph, HxDiagSymmetric(graph), HzzDiagSymmetric(graph))
 
 Constructor for the `QAOA` object.
@@ -18,15 +8,13 @@ mutable struct QAOA{T1 <: AbstractGraph}
     graph::T1
     HB::AbstractVector{Float64}
     HC::AbstractVector{Float64}
-    ψ::AbstractVector{ComplexF64}
-    ∂ψ::AbstractVector{ComplexF64}
 end
 
 function QAOA(N::Int, g::T; applySymmetries=true) where T <: AbstractGraph
     if applySymmetries==false
-        QAOA{T}(N, g, HxDiag(g), HzzDiag(g), 2.0^(-N/2) * ones(ComplexF64, 2^N), zeros(ComplexF64, 2^N))
+        QAOA{T}(N, g, HxDiag(g), HzzDiag(g))
     else
-        QAOA{T}(N-1, g, HxDiagSymmetric(g), HzzDiagSymmetric(g), 2.0^(-(N-1)/2) * ones(ComplexF64, 2^(N-1)), zeros(ComplexF64, 2^N)) 
+        QAOA{T}(N-1, g, HxDiagSymmetric(g), HzzDiagSymmetric(g)) 
     end
 end
 
@@ -156,14 +144,15 @@ function getQAOAState(q::QAOA, Γ::T) where T <: AbstractVector
     β = Γ[2:2:2p]
 
     # First set the state vector to |+⟩
-    q.ψ .= ComplexF64(2^(-q.N/2))
+    ψ = 2^(-q.N/2)*ones(ComplexF64, 2^q.N)
 
     for i ∈ 1:p
-        q.ψ .= exp.(-im * γ[i] * q.HC) .* q.ψ
-        q.ψ .= fwht(q.ψ)              # Fast Hadamard transformation
-        q.ψ .= exp.(-im * β[i] * q.HB) .* q.ψ
-        q.ψ .= ifwht(q.ψ)             # inverse Fast Hadamard transformation
+        ψ .= exp.(-im * γ[i] * q.HC) .* ψ
+        ψ .= fwht(ψ)              # Fast Hadamard transformation
+        ψ .= exp.(-im * β[i] * q.HB) .* ψ
+        ψ .= ifwht(ψ)             # inverse Fast Hadamard transformation
     end
+    return ψ
 end
 
 function getQAOAState(q::QAOA, Γ::T, ψ0::AbstractVector{ComplexF64}) where T <: AbstractVector
@@ -171,17 +160,17 @@ function getQAOAState(q::QAOA, Γ::T, ψ0::AbstractVector{ComplexF64}) where T <
     
     γ = Γ[1:2:2p]
     β = Γ[2:2:2p]
-
-    @assert length(q.ψ) == length(ψ0)
+    
     # First set the state vector to |+⟩
-    q.ψ .= ψ0
+    ψ = copy(ψ0)
 
     for i ∈ 1:p
-        q.ψ .= exp.(-im * γ[i] * q.HC) .* q.ψ
-        q.ψ .= fwht(q.ψ)              # Fast Hadamard transformation
-        q.ψ .= exp.(-im * β[i] * q.HB) .* q.ψ
-        q.ψ .= ifwht(q.ψ)             # inverse Fast Hadamard transformation
+        ψ .= exp.(-im * γ[i] * q.HC) .* ψ
+        ψ .= fwht(ψ)              # Fast Hadamard transformation
+        ψ .= exp.(-im * β[i] * q.HB) .* ψ
+        ψ .= ifwht(ψ)             # inverse Fast Hadamard transformation
     end
+    return ψ
 end
 
 @doc raw"""
@@ -195,8 +184,8 @@ More specifically, it returns the following real number:
 ```
 """
 function (q::QAOA)(Γ::T) where T <: AbstractVector
-    getQAOAState(q, Γ)
-    return real(q.ψ' * (q.HC .* q.ψ))
+    ψ = getQAOAState(q, Γ)
+    return real(ψ' * (q.HC .* ψ))
 end
 
 function ∂βψ(q::QAOA, Γ::T, layer::Int) where T <: AbstractVector
@@ -204,19 +193,20 @@ function ∂βψ(q::QAOA, Γ::T, layer::Int) where T <: AbstractVector
     γ = Γ[1:2:2p]
     β = Γ[2:2:2p]
     
-    q.∂ψ .= ComplexF64(2^(-q.N/2))
+    ψ = 2^(-q.N/2)*ones(ComplexF64, 2^q.N)
     
     for i ∈ 1:p
-        q.∂ψ .= exp.(-im * γ[i] * q.HC) .* q.∂ψ
-        q.∂ψ .= fwht(q.∂ψ) # Fast Hadamard transformation
+        ψ .= exp.(-im * γ[i] * q.HC) .* ψ
+        ψ .= fwht(ψ) # Fast Hadamard transformation
         if i==layer
-            q.∂ψ .= (q.HB .* q.∂ψ)
+            ψ .= (q.HB .* ψ)
         end
-        q.∂ψ .= exp.(-im * β[i] * q.HB) .* q.∂ψ
-        q.∂ψ .= ifwht(q.∂ψ) # inverse Fast Hadamard transformation
+        ψ .= exp.(-im * β[i] * q.HB) .* ψ
+        ψ .= ifwht(ψ) # inverse Fast Hadamard transformation
     end
     # multiply by -i 
-    q.∂ψ .*= -im
+    ψ .*= -im
+    return ψ
 end
 
 function ∂γψ(q::QAOA, Γ::T, layer::Int) where T <: AbstractVector
@@ -224,19 +214,20 @@ function ∂γψ(q::QAOA, Γ::T, layer::Int) where T <: AbstractVector
     γ = Γ[1:2:2p]
     β = Γ[2:2:2p]
 
-    q.∂ψ = state(uniform_state(q.N))[:]
+    ψ = state(uniform_state(q.N))[:]
     
     for i ∈ 1:p
-        q.∂ψ .= exp.(-im * γ[i] * q.HC) .* q.∂ψ
+        ψ .= exp.(-im * γ[i] * q.HC) .* ψ
         if i==layer 
-            q.∂ψ .= (q.HC .* q.∂ψ)
+            ψ .= (q.HC .* ψ)
         end
-        q.∂ψ .= fwht(q.∂ψ)
-        q.∂ψ .= exp.(-im * β[i] * q.HB) .* q.∂ψ
-        q.∂ψ .= ifwht(q.∂ψ) # inverse Fast Hadamard transformation
+        ψ .= fwht(ψ)
+        ψ .= exp.(-im * β[i] * q.HB) .* ψ
+        ψ .= ifwht(ψ) # inverse Fast Hadamard transformation
     end
     # multiply by -i 
-    q.∂ψ .*= -im
+    ψ .*= -im
+    return ψ
 end
 
 @doc raw"""
@@ -252,15 +243,12 @@ function gradCostFunction(qaoa::QAOA, Γ::T) where T <: AbstractVector
     γ = 1:2:2p
     β = 2:2:2p
 
-    getQAOAState(qaoa, Γ)
+    ψ = getQAOAState(qaoa, Γ)
     gradVector = zeros(eltype(Γ), length(Γ))
-    
+
     for i ∈ 1:p
-        ∂γψ(qaoa, Γ, i)
-        gradVector[γ[i]]  = 2.0*real(qaoa.∂ψ' * (qaoa.HC .* qaoa.ψ))
-        
-        ∂βψ(qaoa, Γ, i)
-        gradVector[β[i]]  = 2.0*real(qaoa.∂ψ' * (qaoa.HC .* qaoa.ψ))
+        gradVector[γ[i]]  = 2.0*real(∂γψ(qaoa, Γ, i)' * (qaoa.HC .* ψ))
+        gradVector[β[i]]  = 2.0*real(∂βψ(qaoa, Γ, i)' * (qaoa.HC .* ψ))
     end
     return gradVector
 end

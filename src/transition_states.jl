@@ -35,10 +35,10 @@ end
 
 Implements the symmetries of the QAOA for different graphs. For more detail see the following [`reference`](https://arxiv.org/abs/2209.01159).
 
-For an arbitrary graph, we can restrict both `\gamma` and `\beta` parameters to the `[-\pi/2, \pi/2]` interval. Furthermore, `\beta` parameters
-can be restricted even further to the `[-\pi/4, \pi/4]` interval (see [`here`](https://journals.aps.org/prx/abstract/10.1103/PhysRevX.10.021067))
-Finally, when dealing with regular graphs with odd degree `\gamma` paramaters can be brought to the `[-\pi/4, \pi/4]` interval.
-This function modifies inplace the initial input vector `Γ`. 
+For an arbitrary graph, we can restrict both ``\gamma`` and ``\beta`` parameters to the ``[-\pi/2, \pi/2]`` interval. Furthermore, ``\beta`` parameters
+can be restricted even further to the ``[-\pi/4, \pi/4]`` interval (see [`here`](https://journals.aps.org/prx/abstract/10.1103/PhysRevX.10.021067))
+Finally, when dealing with regular graphs with odd degree `\gamma` paramaters can be brought to the ``[-\pi/4, \pi/4]`` interval.
+This function modifies inplace the initial input vector ``Γ``. 
 """
 function toFundamentalRegion!(qaoa::QAOA, Γ::Vector{Float64})
     p = length(Γ) ÷ 2
@@ -103,7 +103,7 @@ Starting from a local minima we construct a vector corresponding to the transiti
 two new vectors 
 
 ```math
-\Gamma^0_p = \Gamma_{\rm{TS}} + \epsilon \hat{e}_{\rm{min}}, \n
+\Gamma^0_p = \Gamma_{\rm{TS}} + \epsilon \hat{e}_{\rm{min}},
 
 \Gamma^0_m = \Gamma_{\rm{TS}} - \epsilon \hat{e}_{\rm{min}} 
 ```

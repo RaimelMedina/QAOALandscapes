@@ -41,7 +41,7 @@ _, init_point, init_energy = getInitParameter(qaoa, spacing = 0.01) # obtain ini
 
 # Now choose a strategy
 # For example, for transition states we have implemented the Greedy strategy
-greedyData = greedyOptimize(qaoa, Γ0, pmax);
+greedyData = greedyOptimize(qaoa, init_point, pmax);
 ```
 
 ## Warning

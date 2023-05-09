@@ -54,10 +54,10 @@ function fourierJacobian(p::Int64)
     return coeffmat
 end
 
-function rollDownFourier(qaoa::QAOA, Γmin::Vector{Float64})
+function rollDownFourier(qaoa::QAOA, Γmin::Vector{Float64}; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)))
     ΓFourier = toFourierParams(fourierInitialization(Γmin))
 
-    Γmin_fourier, Emin_fourier = optimizeParameters(Val(:Fourier), qaoa, ΓFourier; printout = false);
+    Γmin_fourier, Emin_fourier = optimizeParameters(Val(:Fourier), qaoa, ΓFourier, method=method)
     return Γmin_fourier, Emin_fourier
 end
 
@@ -74,17 +74,17 @@ By default the `BFGS` optimizer is used.
 # Return
 * `result:Dict`. Dictionary with keys being `keys \in [1, pmax]` and values being a `Tuple{Float64, Vector{Float64}}` of cost function value and corresponding parameter.
 """
-function fourierOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int)
+function fourierOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)))
     listMinima = Dict{Int64, Tuple{Float64, Vector{Float64}}}()
     p = length(Γ0) ÷ 2 
-    Γmin, Emin = optimizeParameters(Val(:BFGS), qaoa, Γ0; printout = false)
-    listMinima[p] = (Emin, Γmin)
+    #Γmin, Emin = optimizeParameters(qaoa, Γ0; settings=settings)
+    listMinima[p] = (qaoa(Γ0), Γ0)
 
     println("Circuit depth  | Energy    | gradient norm ")
-    println("    p=$(p)     | $(round(Emin, digits = 7)) | $(norm(gradCostFunction(qaoa, Γmin)))")
+    println("    p=$(p)     | $(round(listMinima[p][1], digits = 7)) | $(norm(gradCostFunction(qaoa, listMinima[p][2])))")
 
     for t = p+1:pmax
-        Γopt, Eopt = rollDownFourier(qaoa, listMinima[t-1][end])
+        Γopt, Eopt = rollDownFourier(qaoa, listMinima[t-1][end], method=method)
         listMinima[t] = (Eopt, Γopt)
         
         println("    p=$(t)     | $(round(Eopt, digits = 7)) | $(norm(gradCostFunction(qaoa, Γopt)))")

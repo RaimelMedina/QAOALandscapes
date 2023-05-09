@@ -187,7 +187,7 @@ function getNegativeHessianEigvec(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; t
         end
             
     else
-        throw(error("Only 'symmetric' and 'non_symmetric' values are accepted"))
+        throw(ArgumentError("Only 'symmetric' and 'non_symmetric' values are accepted"))
     end
 
     basisTransformation = inv(RowTransform)*ColTransform

@@ -9,16 +9,17 @@ are the same as `Γp`
 # Keyword arguments
 * `tsType='symmetric'` Only strings values 'symmetric' and 'non_symmetric' are accepted
 """
-function transitionState(Γ::Vector{Float64}, iγ::Int; tsType="symmetric")
+function transitionState(Γ::AbstractVector{T}, iγ::Int; tsType="symmetric", regularize=false) where T
     p = length(Γ) ÷ 2
     β = Γ[2:2:2p]
     γ = Γ[1:2:2p]
 
-    insert!(γ, iγ, 0.0)
+    val = regularize ? cbrt(eps(Float64)) : T(0)
+    insert!(γ, iγ, val)
     if tsType == "symmetric"
-        insert!(β, iγ, 0.0)
+        insert!(β, iγ, val)
     elseif tsType == "non_symmetric"
-        insert!(β, iγ-1, 0.0)
+        insert!(β, iγ-1, val)
     else
         throw(ArgumentError("Only 'symmetric' and 'non_symmetric' values are accepted"))
     end
@@ -28,6 +29,26 @@ function transitionState(Γ::Vector{Float64}, iγ::Int; tsType="symmetric")
     ΓTS[1:2:2(p+1)] = γ
 
     return ΓTS
+end
+
+@doc raw"""
+    transitionState(Γp::Vector{Float64})
+
+Given an initial state `Γp::Vector{Float64}` of length ``2p`` it creates a matrix ``M_{\rm{TS}}`` of size ``2p+2 \times 2p+1``. 
+The columns of ``M_{\rm{TS}}`` corresponds to the transition states associated with the initial minimum `Γp`. The first `p+1` 
+columns correspond to symmetric TS while the remaining `p` columns correspond to non-symmetric TS.
+"""
+function transitionState(Γmin::AbstractVector{T}; regularize=false) where T
+    p = length(Γmin) ÷ 2
+    vectorOfTS = Vector{T}[]
+    
+    for i ∈ 1:p+1
+        push!(vectorOfTS, transitionState(Γmin, i, tsType="symmetric", regularize=regularize))
+    end
+    for i ∈ 2:p+1
+        push!(vectorOfTS, transitionState(Γmin, i, tsType="non_symmetric", regularize=regularize))
+    end
+    vectorOfTS = reduce(hcat,vectorOfTS)
 end
 
 @doc raw"""
@@ -45,26 +66,24 @@ function toFundamentalRegion!(qaoa::QAOA, Γ::Vector{Float64})
     β = Γ[2:2:2p]
     γ = Γ[1:2:2p]
     
-    # First, folding β ∈ [-π/4, π/4] and
-    # γ ∈ [-π/2, π/2]
+    # First, folding β ∈ [-π/4, π/4]
     for i=1:p #beta angles come first, they are between -pi/4, pi/4
         β[i] = mod(β[i], π/2) # folding beta to interval 0, pi/2
         if β[i] > π/4 # translating it to -pi/4, pi/4 interval
             β[i] -= π/2
         end
-        γ[i] = mod(γ[i], π) # processing gammas by folding them to -pi/2, pi/2 interval
-        if γ[i] > π/2
-            γ[i] -= π
-        end
     end
 
     graph_degree = degree(qaoa.graph)
-    if reduce(*, isodd.(graph_degree)) # enter here if each vertex has odd degree. Assuming regular graphs here :| 
+    isWeightedG  = typeof(qaoa.graph) <: SimpleWeightedGraph
+    if reduce(*, isodd.(graph_degree)) && !isWeightedG 
+        # enter here if each vertex has odd degree d. Assuming regular graphs here :|
+        # also, this only works for unweighted d-regular random graphs 
         for i=1:p
-            # γ[i] = mod(γ[i], π) # processing gammas by folding them to -pi/2, pi/2 interval
-            # if γ[i] > π/2
-            #     γ[i] -= π
-            # end
+            γ[i] = mod(γ[i], π) # processing gammas by folding them to -pi/2, pi/2 interval
+            if γ[i] > π/2
+                γ[i] -= π
+            end
             if abs(γ[i]) > π/4 # now folding them even more: to -pi/4, pi/4 interval
                 β[i:end] .*= -1 # this requires sign flip of betas!
                 γ[i] -= sign(γ[i])*π/2
@@ -75,23 +94,6 @@ function toFundamentalRegion!(qaoa::QAOA, Γ::Vector{Float64})
             end
         end
     end
-    # elseif isdRegularGraph(qaoa.graph, 2)
-    #     for i=1:p
-    #         γ[i] = mod(γ[i], π) # processing gammas by folding them to -pi/2, pi/2 interval
-    #         if γ[i] > π/2
-    #             γ[i] -= π
-    #         end
-    #         if abs(γ[i]) > π/4 # now folding them even more: to -pi/4, pi/4 interval
-    #             β[i:end] .*= -1 # this requires sign flip of betas!
-    #             γ[i] -= sign(γ[i])*π/2
-    #         end
-    #         if γ[1] < 0 # making angle gamma_1 positive
-    #             β .*= -1  # by changing the sign of ALL angles
-    #             γ .*= -1
-    #         end
-    #     end
-    # else
-
     Γ[2:2:2p] = β;
     Γ[1:2:2p] = γ;
 end
@@ -120,15 +122,15 @@ that the obtained vectors have lower energy than the initial vector `Γmin`
 # Return
 * `result:Tuple`. The returned paramaters are as follows => `Γmin_m, Γmin_p, Emin_m, Emin_p, info_m, info_p`
 """
-function rollDownTS(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; ϵ=0.001, tsType="symmetric", optim=Val(:BFGS))
+function rollDownfromTS(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; ϵ=0.001, tsType="symmetric", method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)))
     ΓTs = transitionState(Γmin, ig, tsType=tsType)
-    result = getNegativeHessianEigvec(qaoa, Γmin, ig, tsType=tsType)
+    umin = getNegativeHessianEigvec(qaoa, Γmin, ig, tsType=tsType)["eigvec_approx"]
     
-    Γ0_p = ΓTs + ϵ*result["eigvec_approx"]
-    Γ0_m = ΓTs - ϵ*result["eigvec_approx"]
+    Γ0_p = ΓTs + ϵ*umin
+    Γ0_m = ΓTs - ϵ*umin
     
-    Γmin_p, Emin_p = optimizeParameters(optim, qaoa, Γ0_p; printout = false);
-    Γmin_m, Emin_m = optimizeParameters(optim, qaoa, Γ0_m; printout = false);
+    Γmin_p, Emin_p = optimizeParameters(qaoa, Γ0_p; method=method);
+    Γmin_m, Emin_m = optimizeParameters(qaoa, Γ0_m; method=method);
     
     return [Γmin_m, Γmin_p, [Emin_m, Emin_p]]
 end
@@ -155,36 +157,64 @@ that the obtained vectors have lower energy than the initial vector `Γmin`
 # Return
 * `result:Tuple`. The returned paramaters are as follows => `Γmin_m, Γmin_p, Emin_m, Emin_p, info_m, info_p`
 """
-function rollDownTS(qaoa::QAOA, Γmin::Vector{Float64}; ϵ=0.001, optim=Val(:BFGS), threaded=false, chooseSmooth=false)
+# function rollDownTS(qaoa::QAOA, Γmin::Vector{Float64}, k::Int; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)), ϵ=0.001, threaded=false)
+#     p                = length(Γmin) ÷ 2
+#     parametersResult = Dict{String, Vector{Vector{Float64}}}()  
+#     energiesResult   = Dict{String, Vector{Float64}}()
+#     dictTS  = Dict{String, Vector{Vector{Float64}}}()
+    
+#     indices = [[(x, "symmetric") for x in 1:p+1]; [(x, "non_symmetric") for x in 2:p+1]]
+
+#     if threaded
+#         ThreadsX.map(pair -> begin
+#         x, tsType = pair
+#         dictTS[string((x, x - (tsType == "non_symmetric")))] = rollDownfromTS(qaoa, Γmin, x; method=method, ϵ=ϵ, tsType=tsType)
+#         end, indices)
+#     else
+#         map(pair -> begin
+#         x, tsType = pair
+#         dictTS[string((x, x - (tsType == "non_symmetric")))] = rollDownfromTS(qaoa, Γmin, x; method=method, ϵ=ϵ, tsType=tsType)
+#         end, indices)
+#     end
+    
+#     for l in keys(dictTS)
+#         parametersResult[l] = dictTS[l][1:2]
+#         energiesResult[l]   = dictTS[l][3]
+#     end
+
+#     return selectBestParams(energiesResult, parametersResult, k)
+# end
+
+function rollDownTS(qaoa::QAOA, Γmin::Vector{Float64}; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)), ϵ=0.001, threaded=false)
     p                = length(Γmin) ÷ 2
     parametersResult = Dict{String, Vector{Vector{Float64}}}()  
     energiesResult   = Dict{String, Vector{Float64}}()
-    dictSymmetricTS  = Dict{String, Vector{Vector{Float64}}}()
+    dictTS  = Dict{String, Vector{Vector{Float64}}}()
     
+    indices = [[(x, "symmetric") for x in 1:p+1]; [(x, "non_symmetric") for x in 2:p+1]]
+
     if threaded
-        ThreadsX.map(x->dictSymmetricTS[string((x,x))]   = rollDownTS(qaoa, Γmin, x; ϵ=ϵ, tsType="symmetric", optim=optim), 1:p+1)
-        ThreadsX.map(x->dictSymmetricTS[string((x,x-1))] = rollDownTS(qaoa, Γmin, x; ϵ=ϵ, tsType="non_symmetric", optim=optim), 2:p+1)
+        ThreadsX.map(pair -> begin
+        x, tsType = pair
+        dictTS[string((x, x - (tsType == "non_symmetric")))] = rollDownfromTS(qaoa, Γmin, x; method=method, ϵ=ϵ, tsType=tsType)
+        end, indices)
     else
-        for x in 1:p+1
-            setindex!(dictSymmetricTS, rollDownTS(qaoa, Γmin, x; ϵ=ϵ, tsType="symmetric", optim=optim), string((x,x)))
-            
-            if x != 1
-                setindex!(dictSymmetricTS, rollDownTS(qaoa, Γmin, x; ϵ=ϵ, tsType="non_symmetric", optim=optim), string((x,x-1)))
-            end
-        end
+        map(pair -> begin
+        x, tsType = pair
+        dictTS[string((x, x - (tsType == "non_symmetric")))] = rollDownfromTS(qaoa, Γmin, x; method=method, ϵ=ϵ, tsType=tsType)
+        end, indices)
     end
     
-    for k in keys(dictSymmetricTS)
-        parametersResult[k] = dictSymmetricTS[k][1:2]
-        energiesResult[k]   = dictSymmetricTS[k][3]
+    for l in keys(dictTS)
+        parametersResult[l] = dictTS[l][1:2]
+        energiesResult[l]   = dictTS[l][3]
     end
-    
-    if (chooseSmooth && p>3)
-        for k in keys(dictSymmetricTS)
-            smoothParams = selectSmoothParameter(parametersResult[k])
-            parametersResult[k] = [smoothParams[2]]
-            energiesResult[k]   = [energiesResult[k][smoothParams[1]]]
-        end
-    end
+
     return parametersResult, energiesResult
 end
+# function rollDownTS(qaoa::QAOA, Γmins::Vector{Vector{Float64}}, k::Int; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)), ϵ=0.001, threaded=false)
+#     params_data = map(x->rollDownTS(qaoa, x, k; method=method, ϵ=ϵ, threaded=threaded), Γmins)
+#     params_data = reduce(vcat, params_data)
+#     energ_data  = map(x->qaoa(x), params_data)
+#     return selectBestParams(energ_data, params_data, k)
+# end

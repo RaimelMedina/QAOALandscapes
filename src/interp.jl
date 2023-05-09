@@ -36,10 +36,10 @@ algorithm using the `optim=Val(:BFGS)` optimizer (otherwise `optim=Val(:GD)`)
 # Return
 * `result:Tuple`. The first element corresponds to the vector corresponding to which the algorithm converged to, and the second element is correponding energy_history
 """
-function rollDownInterp(qaoa::QAOA, Γmin::Vector{Float64}; optim = Val(:BFGS))
+function rollDownInterp(qaoa::QAOA, Γmin::Vector{Float64}; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)))
     ΓInterp = interpInitialization(Γmin)
 
-    Γmin_interp, Emin_interp = optimizeParameters(optim, qaoa, ΓInterp; printout = false);
+    Γmin_interp, Emin_interp = optimizeParameters(qaoa, ΓInterp, method=method);
     return Γmin_interp, Emin_interp
 end
 
@@ -56,17 +56,17 @@ By default the `BFGS` optimizer is used.
 # Return
 * `result:Dict`. Dictionary with keys being `keys \in [1, pmax]` and values being a `Tuple{Float64, Vector{Float64}}` of cost function value and corresponding parameter.
 """
-function interpOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int; optim = Val(:BFGS))
+function interpOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)))
     listMinima = Dict{Int64, Tuple{Float64, Vector{Float64}}}()
     p = length(Γ0) ÷ 2 
-    Γmin, Emin = optimizeParameters(optim, qaoa, Γ0; printout = false)
-    listMinima[p] = (Emin, Γmin)
+    #Γmin, Emin = optimizeParameters(qaoa, Γ0; settings=settings)
+    listMinima[p] = (qaoa(Γ0), Γ0)
 
     println("Circuit depth  | Energy    | gradient norm ")
-    println("    p=$(p)     | $(round(Emin, digits = 7)) | $(norm(gradCostFunction(qaoa, Γmin)))")
+    println("    p=$(p)     | $(round(listMinima[p][1], digits = 7)) | $(norm(gradCostFunction(qaoa, listMinima[p][2])))")
 
     for t = p+1:pmax
-        Γopt, Eopt = rollDownInterp(qaoa, listMinima[t-1][end]; optim = optim)
+        Γopt, Eopt = rollDownInterp(qaoa, listMinima[t-1][end]; method=method)
         listMinima[t] = (Eopt, Γopt)
         
         println("    p=$(t)     | $(round(Eopt, digits = 7)) | $(norm(gradCostFunction(qaoa, Γopt)))")

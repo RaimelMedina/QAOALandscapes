@@ -17,7 +17,37 @@ function fwht(a::T) where T <: AbstractVector
 end
 
 function ifwht(a::T) where T <: AbstractVector
-    return fwht(a) / length(a)
+    result = fwht(a)
+    return result/length(a)
+end
+
+function fwht!(f::T, ldn::Int64) where T <: AbstractVector
+    # Transform wrt. to Walsh-Kronecker basis (wak-functions).
+    # Radix-2 decimation in time (DIT) algorithm.
+    # Self-inverse.
+    n = 1 << ldn
+    for ldm in 1:ldn
+        m = 1 << ldm
+        mh = m >> 1
+        for r in 0:m:n-m  # Corrected loop range calculation
+            t1 = r
+            t2 = r + mh
+            for j in 0:(mh - 1)
+                u = f[t1 + 1]  # Adding 1 as Julia uses 1-based indexing
+                v = f[t2 + 1]  # Adding 1 as Julia uses 1-based indexing
+                f[t1 + 1] = u + v  # Adding 1 as Julia uses 1-based indexing
+                f[t2 + 1] = u - v  # Adding 1 as Julia uses 1-based indexing
+                t1 += 1
+                t2 += 1
+            end
+        end
+    end
+end
+
+function ifwht!(a::T, ldn::Int64) where T <: AbstractVector
+    fwht!(a, ldn)
+    n  = 1 << ldn
+    a .= a ./ n
 end
 
 getWeight(edge::T) where T<:Graphs.SimpleGraphs.SimpleEdge = 1.0
@@ -51,7 +81,7 @@ end
 
 function _onehot(i::Int, n::Int)
     (i>n || i<1) ? throw(ArgumentError("Wrong indexing of the unit vector. Please check!")) : nothing
-    vec = zeros(Int64, n)
+    vec = zeros(Float64, n)
     vec[i] = 1
     return vec
 end
@@ -82,3 +112,40 @@ end
 function isdRegularGraph(g::T, d::Int) where T <: AbstractGraph
     return reduce(*, degree(g) .== d)
 end
+
+function selectBestParams(eDict::Dict{String, Vector{Float64}}, pDict::Dict{String, Vector{Vector{Float64}}}, k::Int; sigdigits=6)
+    # first, process the energies #
+    kth_smallest_idx = findkthSmallestEnergy(reduce(hcat, values(eDict)), k; sigdigits = sigdigits)
+    keysVec = keys(eDict) |> collect
+    println("Keeping the $(k)-th best new local minima")
+    return map(x->pDict[keysVec[x[2]]][x[1]], kth_smallest_idx)
+end
+
+function selectBestParams(eDict::Vector{Float64}, pDict::Vector{Vector{Float64}}, k::Int; sigdigits=6)
+    # first, process the energies #
+    kth_smallest_idx = findkthSmallestEnergy(eDict, k; sigdigits = sigdigits)
+    println("Keeping the $(k)-th best new local minima")
+    return map(x->pDict[x], kth_smallest_idx)
+end
+
+function findkthSmallestEnergy(arr::AbstractArray, k::Int; sigdigits=6)
+    flattened = vec(arr)
+    rounded_flattened = round.(flattened, sigdigits=sigdigits)
+
+    unique_values_indices = Dict{Float64, Int}()
+    for (index, value) in enumerate(rounded_flattened)
+        if !haskey(unique_values_indices, value)
+            unique_values_indices[value] = index
+        end
+    end
+
+    unique_values = sort(collect(keys(unique_values_indices)))
+    k_smallest_values = unique_values[1:k]
+
+    k_smallest_indices = [unique_values_indices[v] for v in k_smallest_values]
+    cartesian_indices = CartesianIndices(size(arr))
+    row_col_indices = [cartesian_indices[i] for i in k_smallest_indices]
+
+    return row_col_indices
+end
+

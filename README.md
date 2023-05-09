@@ -4,17 +4,13 @@
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://raimelmedina.github.io/QAOALandscapes/dev/)
 
 
-QAOALandscapes is a Julia package for simulating the QAOA algorithm for MaxCut type problems. Currently, three initialization/optimization strategies are implemented:
+QAOALandscapes is a Julia package for simulating the QAOA algorithm for MaxCut type problems with the goal of understanding and exploring the classical optimization landscape. We would like to understand why some of the heuristic initialization/optimization strategies out there work the way they do. Currently, three initialization/optimization strategies are implemented:
 
 - Transition states.
 - Interpolation (Interp) strategy.
 - Fourier strategy.
 
-In terms of optimization, we currently support two gradient-based methods: 
-- Gradient Descent using the Adam optimizer
-- BFGS with BackTracking order 3. 
-
-We use [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/). The computation of the cost function/energy gradient is done analytically.
+In terms of optimization, we currently support all the methods available through [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/). The computation of the cost function/energy gradient is done using the **adjoint differentiation method** from this very nice paper [`Efficient calculation of gradients in classical simulations of variational quantum algorithms`](https://arxiv.org/abs/2009.02823).
 
 ## Installation
 
@@ -37,7 +33,7 @@ pmax = 10 # maximum circuit depth to explore
 g    = random_regular_graph(n, d)
 
 qaoa = QAOA(n, g, applySymmetries = true) # Uses the parity symmetry of the problem
-_, init_point, init_energy = getInitParameter(qaoa, spacing = 0.01) # obtain initial parameters at p=1
+_, init_point, init_energy = getInitialParameter(qaoa, spacing = 0.01) # obtain initial parameters at p=1
 
 # Now choose a strategy
 # For example, for transition states we have implemented the Greedy strategy

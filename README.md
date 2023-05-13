@@ -10,7 +10,7 @@ QAOALandscapes is a Julia package for simulating the QAOA algorithm for MaxCut t
 - Interpolation (Interp) strategy.
 - Fourier strategy.
 
-In terms of optimization, we currently support all the methods available through [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/). The computation of the cost function/energy gradient is done using the **adjoint differentiation method** from this very nice paper [`Efficient calculation of gradients in classical simulations of variational quantum algorithms`](https://arxiv.org/abs/2009.02823).
+In terms of optimization, we currently support all the methods available through [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/). The computation of the cost function/energy gradient is done using the **adjoint differentiation method** from this very nice paper [*Efficient calculation of gradients in classical simulations of variational quantum algorithms*](https://arxiv.org/abs/2009.02823).
 
 ## Installation
 

@@ -1,9 +1,14 @@
 module QAOALandscapes
 
+using SparseArrays
+const OperatorType{T} = Union{SparseMatrixCSC{T,Int64}, Vector{T}}
+
 # Functions related to an arbitrary QAOA  
-export QAOA, HxDiag, HxDiagSymmetric, HzzDiag, HzzDiagSymmetric, gradCostFunction, hessianCostFunction, getQAOAState, elementHessianCostFunction, optimizeParameters
+export QAOA, HxDiag, HxDiagSymmetric, HzzDiag, HzzDiagSymmetric, generalClassicalHamiltonian,  getQAOAState, gradCostFunction, hessianCostFunction, geometricTensor
+export elementHessianCostFunction, optimizeParameters
+
 export toFundamentalRegion!
-export getStateJacobian, quantumFisherInfoMatrix
+
 export getInitialParameter
 # Functions related to different initialization strategies
 # Interp
@@ -11,7 +16,7 @@ export interpInitialization, rollDownInterp, interpOptimize
 # Fourier
 export toFourierParams, fromFourierParams, fourierInitialization, fourierJacobian, rollDownFourier, fourierOptimize
 # Transition states
-export transitionState, permuteHessian, getNegativeHessianEigval, getNegativeHessianEigvec, rollDownTS, greedyOptimize, greedySelect
+export transitionState, permuteHessian, getNegativeHessianEigval, getNegativeHessianEigvec, rollDownfromTS, rollDownTS, greedyOptimize, greedySelect
 
 # Some useful Functions
 export spinChain
@@ -20,14 +25,10 @@ export gradStdTest, selectSmoothParameter, whichTSType, _onehot
 # Benchmark with respect to Harvard hard harvard instance
 export harvardGraph
 
-# Optimization settings
-export OptimizationSettings
 
-using DiffResults
+
 using Graphs
-using FiniteDiff
 using ForwardDiff
-using Flux
 using SimpleWeightedGraphs
 using Optim
 using LineSearches
@@ -38,6 +39,7 @@ using Statistics
 using LoopVectorization 
 
 include("qaoa.jl")
+include("hamiltonians.jl")
 include("hessian_tools.jl")
 include("transition_states.jl")
 include("greedy_ts.jl")

@@ -1,5 +1,5 @@
-function greedySelect(qaoa::QAOA, Γmin::Vector{Float64}; ϵ=0.001, method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)), threaded=false, chooseSmooth=false)
-    paramResult, energyResult = rollDownTS(qaoa, Γmin; ϵ=ϵ, method=method, threaded=threaded, chooseSmooth=chooseSmooth)
+function greedySelect(qaoa::QAOA, Γmin::Vector{Float64}; ϵ=0.001, method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)), threaded=false)
+    paramResult, energyResult = rollDownTS(qaoa, Γmin; ϵ=ϵ, method=method, threaded=threaded)
     # get key of minimum energy #
     valMinimum, keyMinimum = findmin(energyResult);
     # determine which point to take #
@@ -18,7 +18,7 @@ function greedyOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int, igamma::Int
     println("    p=$(p)     | $(round(listMinima[p][1], digits = 7)) | $(norm(gradCostFunction(qaoa, listMinima[p][2])))")
     
     for t ∈ p+1:pmax
-        dataGreedy = rollDownTS(qaoa, listMinima[t-1][end], igamma; ϵ=ϵ, method=method, tsType=tsType)
+        dataGreedy = rollDownfromTS(qaoa, listMinima[t-1][end], igamma; ϵ=ϵ, method=method, tsType=tsType)
         if chooseSmooth
             idxSmooth, paramSmooth = selectSmoothParameter(dataGreedy[1], dataGreedy[2])
             Eopt = dataGreedy[3][idxSmooth]
@@ -44,7 +44,7 @@ function greedyOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int; ϵ=0.001, m
     println("    p=$(p)     | $(round(listMinima[p][1], digits = 7)) | $(norm(gradCostFunction(qaoa, listMinima[p][2])))")
     
     for t ∈ p+1:pmax
-        Eopt, Γopt = greedySelect(qaoa, listMinima[t-1][end]; ϵ=ϵ, method=method, threaded=threaded, chooseSmooth=chooseSmooth)
+        Eopt, Γopt = greedySelect(qaoa, listMinima[t-1][end]; ϵ=ϵ, method=method, threaded=threaded)
         listMinima[t] = (Eopt, Γopt)
         println("    p=$(t)     | $(round(Eopt, digits = 7)) | $(norm(gradCostFunction(qaoa, Γopt)))")
     end

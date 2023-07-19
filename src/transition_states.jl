@@ -94,8 +94,9 @@ function toFundamentalRegion!(qaoa::QAOA, Γ::Vector{Float64})
             end
         end
     end
-    Γ[2:2:2p] = β;
-    Γ[1:2:2p] = γ;
+    Γ[2:2:2p] = β
+    Γ[1:2:2p] = γ
+    return nothing
 end
 
 @doc raw"""

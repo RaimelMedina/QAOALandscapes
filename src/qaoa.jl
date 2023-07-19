@@ -13,7 +13,7 @@ end
 
 function QAOA(g::T; applySymmetries=true) where T <: AbstractGraph
     if applySymmetries==false
-        h = HzzDiag(g)
+        h = 2.0*HzzDiag(g)
         QAOA{T, eltype(h)}(nv(g), g, HxDiag(g), h, h)
     else
         h = HzzDiagSymmetric(g)

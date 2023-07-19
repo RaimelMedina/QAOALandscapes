@@ -32,7 +32,7 @@ function optimizeParameters(
         end
         result = Optim.optimize(qaoa, g!, params, method=method)
     elseif diffMode == :forward
-        result = Optim.optimize(qaoa, params,  autodiff = diffMode)
+        result = Optim.optimize(qaoa, params, method = method, autodiff = diffMode)
     else
         throw(ArgumentError("Wrong diffMode = $(diffMode) given. Supported modes are :adjoint (default) and :forward"))
     end

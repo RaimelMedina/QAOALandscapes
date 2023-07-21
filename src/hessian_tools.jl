@@ -214,3 +214,30 @@ function getNegativeHessianEigvec(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; t
     end
     return result
 end
+
+"""
+    getHessianIndex(qaoa::QAOA, Γ::AbstractVector{T}; checks=true, tol=1e-6) where T<:Real
+
+Calculate the Hessian index of a stationary (it checks the gradient norm) point of the QAOA energy function
+
+# Arguments
+- `qaoa`: a QAOA object.
+- `Γ`: a vector of parameters.
+
+# Keyword Arguments
+- `checks=true`: a boolean to decide whether to check if the gradient of the cost function is smaller than a certain tolerance.
+- `tol=1e-6`: a tolerance level for the gradient of the cost function.
+
+# Output
+- Returns the Hessian index, i.e., the number of negative eigenvalues of the Hessian matrix.
+
+# Notes
+The function first calculates the gradient of the cost function for the given `qaoa` and `Γ`. If `checks=true`, it asserts that the norm of this gradient is less than `tol`. It then calculates the Hessian matrix and its eigenvalues, and returns the count of eigenvalues less than zero.
+
+"""
+function getHessianIndex(qaoa::QAOA, Γ::AbstractVector{T}; checks=true, tol=1e-6) where T<:Real
+    checks ? assert(norm(gradCostFunction(qaoa, Γ)) < tol) : nothing
+
+    hessian_matrix = hessianCostFunction(qaoa, Γ)
+    return count(x->x<0, eigvals(hessian_matrix))
+end

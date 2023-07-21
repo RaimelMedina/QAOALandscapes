@@ -16,7 +16,9 @@ export interpInitialization, rollDownInterp, interpOptimize
 # Fourier
 export toFourierParams, fromFourierParams, fourierInitialization, fourierJacobian, rollDownFourier, fourierOptimize
 # Transition states
-export transitionState, permuteHessian, getNegativeHessianEigval, getNegativeHessianEigvec, rollDownfromTS, rollDownTS, greedyOptimize, greedySelect
+export transitionState, permuteHessian, getNegativeHessianEigval, getNegativeHessianEigvec, rollDownfromTS, rollDownTS, greedyOptimize, greedySelect, getHessianIndex
+# General stationary points
+export getStationaryPoints, gradSquaredNorm, optimizeGradSquaredNorm, getStationaryPoints
 
 # Some useful Functions
 export spinChain
@@ -37,6 +39,7 @@ using FLoops
 using ThreadsX
 using Statistics
 using LoopVectorization 
+using Base.Threads
 
 include("qaoa.jl")
 include("hamiltonians.jl")
@@ -50,4 +53,5 @@ include("harvard_instance.jl")
 include("optimization_settings.jl")
 include("gradient_adjoint.jl")
 include("state_utilities.jl")
+include("saddles_search.jl")
 end

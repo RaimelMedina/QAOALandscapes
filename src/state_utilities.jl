@@ -37,16 +37,17 @@ The energies are rounded to a certain number of significant digits (default is 5
 
 # Arguments
 * `qaoa::QAOA`: QAOA object.
+* `ham=qaoa.HC`: Hamiltonian used to construct the energy-equivalence classes.
 * `sigdigits=5`: Significant digits to which energies are rounded.
 
 # Returns
-* `data_states`: A Vector of Vectors, where each inner Vector contains the indices of the states belonging to the same energy equivalence class.
+* `data_states::Vector{Vector{Int64}}`: Each inner vector contains the indices of the states belonging to the same energy equivalence class.
 """
-function getStateEquivClasses(qaoa::QAOA; sigdigits=5)
-    unique_energies = round.(qaoa.HC, sigdigits=sigdigits) |> unique |> sort
+function getStateEquivClasses(qaoa::QAOA; ham=qaoa.HC, sigdigits=5)
+    unique_energies = round.(ham, sigdigits=sigdigits) |> unique |> sort
     data_states = Vector{Vector{Int64}}()
     for x ∈ unique_energies
-        push!(data_states, findall(s->isapprox(s, x), qaoa.HC))
+        push!(data_states, findall(s->isapprox(s, x), ham))
     end
     return data_states
 end
@@ -61,7 +62,7 @@ Computes the computational basis weights for a given state vector `ψ` according
 * `equivClasses`: A Vector of Vectors, where each inner Vector contains the indices of the elements belonging to the same equivalence class.
 
 # Returns
-* `basis_weights`: A Vector containing the summed squared magnitudes of `ψ` for each equivalence class.
+* `basis_weights::Vector{Float64}`: A Vector containing the summed squared magnitudes of `ψ` for each equivalence class.
 """
 function computationalBasisWeights(ψ, equivClasses)
     return map(x-> sum(abs2.(getindex(ψ, x))), equivClasses)

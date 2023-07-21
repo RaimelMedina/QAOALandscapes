@@ -7,6 +7,7 @@ Given an initial state `Γp::Vector{Float64}` of length `2p` it creates another 
 ```math
 \gamma^i_{p+1} = \frac{i-1}{p} \gamma^{i-1}_{p} + \frac{p-i+1}{p}\gamma^{i}_{p}
 ```
+and analogously for the ``\beta`` components.
 """
 function interpInitialization(Γ::Vector{Float64})
     p = length(Γ) ÷ 2
@@ -26,12 +27,15 @@ end
 @doc raw"""
     rollDownInterp(qaoa::QAOA, Γmin::Vector{Float64}; optim = Val(:BFGS))
     
-Starting from a local minima we construct a new vector using the INTERP initialization. From there we carry out the optimization
-algorithm using the `optim=Val(:BFGS)` optimizer (otherwise `optim=Val(:GD)`) 
+Starting from a local minima we construct a new vector using the INTERP initialization from which we perform the
+optimization. 
 
 # Arguments 
 * `qaoa::QAOA`: QAOA object 
 * `Γmin::Vector{Float64}`: Vector correponding to the local minimum from which we will construct the particular TS and then **roll down** from.
+
+# Optional
+* `method=Optim.BFGS(linesearch = Optim.BackTracking(order=3))`: Default optimizer and linesearch choice. For more available choices see [*Optim.jl*](https://julianlsolvers.github.io/Optim.jl/stable/) 
 
 # Return
 * `result:Tuple`. The first element corresponds to the vector corresponding to which the algorithm converged to, and the second element is correponding energy_history
@@ -53,6 +57,9 @@ By default the `BFGS` optimizer is used.
 * `qaoa::QAOA`: QAOA object 
 * `Γ0::Vector{Float64}`: Vector correponding to the local minimum from which we will construct the particular TS and then **roll down** from.
 
+# Optional
+* `method=Optim.BFGS(linesearch = Optim.BackTracking(order=3))`: Default optimizer and linesearch choice. For more available choices see [*Optim.jl*](https://julianlsolvers.github.io/Optim.jl/stable/) 
+
 # Return
 * `result:Dict`. Dictionary with keys being `keys \in [1, pmax]` and values being a `Tuple{Float64, Vector{Float64}}` of cost function value and corresponding parameter.
 """
@@ -62,14 +69,14 @@ function interpOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int; method=Opti
     #Γmin, Emin = optimizeParameters(qaoa, Γ0; settings=settings)
     listMinima[p] = (qaoa(Γ0), Γ0)
 
-    println("Circuit depth  | Energy    | gradient norm ")
-    println("    p=$(p)     | $(round(listMinima[p][1], digits = 7)) | $(norm(gradCostFunction(qaoa, listMinima[p][2])))")
+    println("Circuit depth \t | Energy \t | gradient norm ")
+    println("p=$(p) \t | $(round(listMinima[p][1], digits = 7)) \t | $(norm(gradCostFunction(qaoa, listMinima[p][2])))")
 
     for t = p+1:pmax
         Γopt, Eopt = rollDownInterp(qaoa, listMinima[t-1][end]; method=method)
         listMinima[t] = (Eopt, Γopt)
         
-        println("    p=$(t)     | $(round(Eopt, digits = 7)) | $(norm(gradCostFunction(qaoa, Γopt)))")
+        println("p=$(t) \t | $(round(Eopt, digits = 7)) \t | $(norm(gradCostFunction(qaoa, Γopt)))")
     end
     return listMinima
 end

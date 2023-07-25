@@ -236,7 +236,7 @@ The function first calculates the gradient of the cost function for the given `q
 
 """
 function getHessianIndex(qaoa::QAOA, Γ::AbstractVector{T}; checks=true, tol=1e-6) where T<:Real
-    checks ? assert(norm(gradCostFunction(qaoa, Γ)) < tol) : nothing
+    checks ? @assert(norm(gradCostFunction(qaoa, Γ)) < tol) : nothing
 
     hessian_matrix = hessianCostFunction(qaoa, Γ)
     return count(x->x<0, eigvals(hessian_matrix))

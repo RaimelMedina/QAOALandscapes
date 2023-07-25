@@ -91,31 +91,16 @@ function getStationaryPoints(qaoa::QAOA, p::Integer,
     converged_energies = zeros(num_points)
     
     if threaded
-        Threads.@threads for (i, point) in enumerate(grid_of_points)
-            converged_points[:, i], converged_energies[i] = optimizeGradSquaredNorm(qaoa, collect(point), method=method, printout = printout)
+        Threads.@threads for i in eachindex(grid_of_points)
+            converged_points[:, i], _ = optimizeGradSquaredNorm(qaoa, collect(grid_of_points[i]), method=method, printout = printout)
+            converged_energies[i] = qaoa(converged_points[:, i])
         end
     else
         for (i, point) in enumerate(grid_of_points)
-            converged_points[:, i], converged_energies[i] = optimizeGradSquaredNorm(qaoa, collect(point), method=method, printout = printout)
+            converged_points[:, i], _ = optimizeGradSquaredNorm(qaoa, collect(point), method=method, printout = printout)
+            converged_energies[i] = qaoa(converged_points[:, i])
         end
     end
 
     return converged_energies, converged_points
 end
-
-    
-#     #converged_points = Dict{Vector{Float64}, Tuple{Float64, Float64}}()
-
-#     @showprogress for point in grid_of_points
-#         temp_params, temp_energy = optimizeGradSquaredNorm(qaoa, collect(point), method=method, printout = printout)
-        
-#         printout ? println(" ") : nothing
-#         temp_params .= round.(temp_params, digits = sigdigits)
-#         if haskey(converged_points, temp_params) || abs(qaoa(temp_params)) < 1e-6
-#             nothing
-#         else
-#             converged_points[temp_params] = (qaoa(temp_params), temp_energy)
-#         end
-#     end
-#     return converged_points
-# end

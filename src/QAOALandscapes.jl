@@ -27,8 +27,6 @@ export gradStdTest, selectSmoothParameter, whichTSType, _onehot
 # Benchmark with respect to Harvard hard harvard instance
 export harvardGraph
 
-
-
 using Graphs
 using ForwardDiff
 using SimpleWeightedGraphs

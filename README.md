@@ -17,8 +17,7 @@ In terms of optimization, we currently support all the methods available through
 To install QAOALandscapes, open the Julia REPL and run the following command:
 
 ```julia
-] activate QAOALandscapes
-] instantiate
+] add https://github.com/RaimelMedina/QAOALandscapes.git
 ```
 ## Usage 
 Here is an example of how to use QAOALandscapes to solve a MaxCut type problem:

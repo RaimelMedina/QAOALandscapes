@@ -18,7 +18,7 @@ export toFourierParams, fromFourierParams, fourierInitialization, fourierJacobia
 # Transition states
 export transitionState, permuteHessian, getNegativeHessianEigval, getNegativeHessianEigvec, rollDownfromTS, rollDownTS, greedyOptimize, greedySelect, getHessianIndex
 # General stationary points
-export getStationaryPoints, gradSquaredNorm, optimizeGradSquaredNorm, getStationaryPoints
+export getStationaryPoints, gradSquaredNorm, optimizeGradSquaredNorm, gad
 
 # Some useful Functions
 export spinChain

@@ -107,7 +107,7 @@ end
 @doc raw"""
     hessianCostFunction(qaoa::QAOA, Γ::AbstractVector{T}) where T<:Real
 
-Computes the cost function Hessian at the point ``\Gamma`` in parameter space. At the moment, we do it by using the [`FiniteDiff.jl`](https://github.com/JuliaDiff/FiniteDiff.jl)
+Computes the cost function Hessian at the point ``\Gamma`` in parameter space. Currently, we use the [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl) package
 """
 function hessianCostFunction(q::QAOA, Γ::AbstractVector{T}) where T<:Real
     matHessian = ForwardDiff.hessian(q, Γ)

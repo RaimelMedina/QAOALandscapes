@@ -104,3 +104,63 @@ function getStationaryPoints(qaoa::QAOA, p::Integer,
 
     return converged_energies, converged_points
 end
+
+
+
+"""
+    gad(qaoa::QAOA, init_point::Vector{T}; niter = 500, η=0.01, tol=1e-5) where T<:Real
+
+Perform the Gentlest Ascent Dynamics (GAD) optimization algorithm on a QAOA problem with the goal to find index-1 saddle points.
+
+# Arguments
+- `qaoa::QAOA`: a QAOA problem instance.
+- `init_point::Vector{T}`: the initial point in parameter space, where `T` is a subtype of `Real`.
+- `niter::Int=500`: the maximum number of iterations to perform (optional, default is 500).
+- `η::Float64=0.01`: the step size for the GAD algorithm (optional, default is 0.01).
+- `tol::Float64=1e-5`: the tolerance for the gradient norm. If the norm falls below this value, the algorithm stops (optional, default is 1e-5).
+
+# Returns
+- `point_history`: history of points during the iterations.
+- `energ_history`: history of energy values during the iterations.
+- `grad_history`: history of gradient norms during the iterations.
+
+# Usage
+```julia
+point_history, energ_history, grad_history = gad(qaoa, init_point, niter=500, η=0.01, tol=1e-5)
+"""
+function gad(qaoa::QAOA, init_point::Vector{T}; niter = 500, η=0.01, tol=1e-5) where T<:Real
+    p = length(init_point)
+    
+    point_temp = copy(init_point)
+    
+    point_history = []
+    energ_history = Float64[]
+    grad_history  = Float64[]
+    
+    v_hess = zeros(T, 2p)
+    grad   = zeros(T, 2p)
+    hess   = zeros(T, 2p, 2p)
+    for i ∈ 1:niter
+        # compute grad #
+        grad = gradCostFunction(qaoa, point_temp)
+        # compute hessian #
+        hess = hessianCostFunction(qaoa, point_temp)
+        v_hess = eigen(hess).vectors[:, 1]
+        # perform one iteration
+        point_temp .+= η*(-grad + 2*dot(grad, v_hess)*v_hess)
+        toFundamentalRegion!(qaoa, point_temp)
+        
+        push!(point_temp, point_history)
+        push!(qaoa(point_temp), energ_history)
+        push!(gradCostFunction(qaoa, point_temp) |> norm, grad_history)
+
+        if grad_history[end] <= tol
+            println("Algorithm converged at iteration iter=$(i)")
+            break
+        end
+    end
+    println("Maximum number of iterations reached niter=$(niter)")
+    println("---- Gradient norm is ∇E = $(grad_history[end])")
+    println("---- Energy of converged point E = $(energ_history[end])")
+    return point_history, energ_history, grad_history
+end

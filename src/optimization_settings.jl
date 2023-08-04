@@ -13,6 +13,9 @@ Optimizes the QAOA parameters using the specified optimization method and linese
 - `method`: The optimization method to be used (default: `Optim.BFGS(linesearch = Optim.BackTracking(order=3))`).
 - `printout::Bool`: Whether to print optimization progress information (default: `false`).
 
+!!! Important
+- `diffMode` = :adjoint is the default but is only meant to be used for 1st and quasi 2nd order method. Use `diffMode=:forward` if you want to use something like Newton's methdd 
+
 # Returns
 - A tuple containing the optimized parameters and the corresponding minimum cost function value.
 

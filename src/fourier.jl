@@ -1,3 +1,13 @@
+function fourierJacobian(p::Int)
+    coeffmat = zeros(p,p)
+    for j ∈ 1:p
+        for i ∈ 1:p
+            coeffmat[i,j] = (j-1/2)*(i-1/2)*π
+        end
+    end
+    return coeffmat
+end
+
 function fromFourierParams(Γu::Vector{Float64})
     p = length(Γu) ÷ 2
     coeffmat = fourierJacobian(p)
@@ -21,11 +31,8 @@ function toFourierParams(Γ::Vector{Float64})
 end
 
 function fourierInitialization(Γmin::Vector{Float64})
-    p    = length(Γmin) ÷ 2
     Γu   = toFourierParams(Γmin)
-    
     append!(Γu, [0.0, 0.0])
-    
     Γnew = fromFourierParams(Γu)
     return Γnew
 end
@@ -40,23 +47,11 @@ function gradCostFunctionFourier(qaoa::QAOA, Γu::Vector{Float64})
     gradΓu          = zeros(2p)
     gradΓu[1:2:2p] .= (sin.(coeffmat ./ p)) * gradΓ[1:2:2p]
     gradΓu[2:2:2p] .= (cos.(coeffmat ./ p)) * gradΓ[2:2:2p]
-    
     return gradΓu
-end
-
-function fourierJacobian(p::Int64)
-    coeffmat = zeros(p,p)
-    for j ∈ 1:p
-        for i ∈ 1:p
-            coeffmat[i,j] = (j-1/2)*(i-1/2)*π
-        end
-    end
-    return coeffmat
 end
 
 function rollDownFourier(qaoa::QAOA, Γmin::Vector{Float64}; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)))
     ΓFourier = toFourierParams(fourierInitialization(Γmin))
-
     Γmin_fourier, Emin_fourier = optimizeParameters(Val(:Fourier), qaoa, ΓFourier, method=method)
     return Γmin_fourier, Emin_fourier
 end

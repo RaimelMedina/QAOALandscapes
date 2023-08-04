@@ -25,7 +25,7 @@ function interpInitialization(Γ::Vector{Float64})
 end
 
 @doc raw"""
-    rollDownInterp(qaoa::QAOA, Γmin::Vector{Float64}; optim = Val(:BFGS))
+    rollDownInterp(qaoa::QAOA, Γmin::Vector{Float64}; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)))
     
 Starting from a local minima we construct a new vector using the INTERP initialization from which we perform the
 optimization. 
@@ -48,7 +48,7 @@ function rollDownInterp(qaoa::QAOA, Γmin::Vector{Float64}; method=Optim.BFGS(li
 end
 
 @doc raw"""
-    interpOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int; optim = Val(:BFGS))
+    interpOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)))
     
 Starting from a local minima `Γ0` at ``p=1`` it performs the `Interp` optimization strategy until the circuit depth `pmax` is reached.
 By default the `BFGS` optimizer is used. 

@@ -1,10 +1,22 @@
 module QAOALandscapes
 
+# using AppleAccelerate
+# USE_APPLE_ACCELERATE = false
+
+# function setAppleAccelerate()
+#     global  USE_APPLE_ACCELERATE = true
+# end
+
+# if Sys.isapple() && USE_APPLE_ACCELERATE
+#     AppleAccelerate.@replaceBase sin cos tan exp abs
+#     AppleAccelerate.@replaceBase(^, /)
+# end
+
 using SparseArrays
 const OperatorType{T} = Union{SparseMatrixCSC{T,Int64}, Vector{T}}
 
 # Functions related to an arbitrary QAOA  
-export QAOA, HxDiag, HxDiagSymmetric, HzzDiag, HzzDiagSymmetric, generalClassicalHamiltonian,  getQAOAState, gradCostFunction, hessianCostFunction, geometricTensor
+export QAOA, HxDiag, HxDiagSymmetric, HzzDiag, HzzDiagSymmetric, generalClassicalHamiltonian,  getQAOAState, getQAOAState!, gradCostFunction, hessianCostFunction, geometricTensor
 export elementHessianCostFunction, optimizeParameters
 
 export toFundamentalRegion!
@@ -20,6 +32,8 @@ export transitionState, permuteHessian, getNegativeHessianEigval, getNegativeHes
 # General stationary points
 export getStationaryPoints, gradSquaredNorm, optimizeGradSquaredNorm, gad
 
+export Node, IdNodes, constructPartialOptimizationGraph
+
 # Some useful Functions
 export spinChain
 export gradStdTest, selectSmoothParameter, whichTSType, _onehot
@@ -29,6 +43,7 @@ export harvardGraph
 
 using Graphs
 using ForwardDiff
+using Random
 using SimpleWeightedGraphs
 using Optim
 using LineSearches
@@ -37,9 +52,17 @@ using FLoops
 using ThreadsX
 using Statistics
 using LoopVectorization 
+using Distributions
 using Base.Threads
+using Combinatorics
+using KrylovKit
+
+function setRandomSeed(seed::Int)
+    Random.seed!(seed)
+end
 
 include("qaoa.jl")
+include("layers.jl")
 include("hamiltonians.jl")
 include("hessian_tools.jl")
 include("transition_states.jl")
@@ -52,4 +75,5 @@ include("optimization_settings.jl")
 include("gradient_adjoint.jl")
 include("state_utilities.jl")
 include("saddles_search.jl")
+include("experimental.jl")
 end

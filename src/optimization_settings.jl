@@ -93,6 +93,48 @@ function optimizeParameters(::Val{:Fourier}, qaoa::QAOA, params::AbstractVector{
     return fromFourierParams(parameters), cost
 end
 
+"""
+    optimizeParametersSlice(qaoa::QAOA, ΓTs::Vector{Float64}, u::Vector{Float64};
+                            method=Optim.BFGS(linesearch=LineSearches.BackTracking(order=3)))
+
+Optimize the parameters of the QAOA along the index-1 direction of the transition state `ΓTs`. 
+
+# Arguments
+
+- `qaoa::QAOA`: QAOA instance 
+- `ΓTs::Vector{Float64}`: Initial parameter vector. We assume that `ΓTs` is an index-1 saddle point and the `u` is the index-1 direction
+- `u::Vector{Float64}`: Direction along which the `QAOA` cost function is going to be optimized. 
+- `method`: The optimization method to be used for the parameter optimization.
+    Default: `Optim.BFGS(linesearch=LineSearches.BackTracking(order=3))`.
+
+# Returns
+
+- `f_vals::Vector{Float64}`: The minimum objective function values obtained from the optimization process for the negative and positive parameter shift cases.
+- `x_vals::Vector{Vector{Float64}}`: The corresponding parameter values that yield the minimum objective function values.
+
+"""
+function optimizeParametersSlice(qaoa::QAOA, ΓTs::Vector{Float64}, u::Vector{Float64}; method=Optim.BFGS(linesearch=LineSearches.BackTracking(order=3)))
+    f(x) = qaoa(ΓTs + u*x[1])
+    # Set limits of search #
+    lower = [-1.0]
+    upper = [1.0]
+    
+    # Set initial parameters
+    x0_p = [0.01]
+    x0_m = [-0.01]
+    
+    # Set inner optimizer #
+    inner_optimizer = Optim.BFGS(linesearch=LineSearches.BackTracking(order=3))
+    
+    res_m = optimize(f, lower, upper, x0_m, Fminbox(method), autodiff=:forward)
+    res_p = optimize(f, lower, upper, x0_p, Fminbox(method), autodiff=:forward)
+    
+    f_vals  = [Optim.minimum(res_m), Optim.minimum(res_p)]
+    x_vals  = [Optim.minimizer(res_m), Optim.minimizer(res_p)]
+    
+    return f_vals, x_vals
+end
+
 @doc raw"""
     getInitParameter(qaoa::QAOA; spacing = 0.01, gradTol = 1e-6)
 

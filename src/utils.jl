@@ -53,25 +53,25 @@ end
 getWeight(edge::T) where T<:Graphs.SimpleGraphs.SimpleEdge = 1.0
 getWeight(edge::T) where T<:SimpleWeightedEdge = edge.weight
 
-function gradStdTest(v::Vector{Float64})
-    dim = length(v)
-    Δβ = v[2:2:dim] |> diff
-    Δγ = v[1:2:dim] |> diff
-    return mean([std(Δβ), std(Δγ)])
-end
+# function gradStdTest(v::Vector{Float64})
+#     dim = length(v)
+#     Δβ = v[2:2:dim] |> diff
+#     Δγ = v[1:2:dim] |> diff
+#     return mean([std(Δβ), std(Δγ)])
+# end
 
-function selectSmoothParameter(Γ1::Vector{Float64}, Γ2::Vector{Float64})
-    vectors = [Γ1, Γ2]
-    res = gradStdTest.(vectors)
-    idx = argmin(res)
-    return idx, vectors[idx]
-end
+# function selectSmoothParameter(Γ1::Vector{Float64}, Γ2::Vector{Float64})
+#     vectors = [Γ1, Γ2]
+#     res = gradStdTest.(vectors)
+#     idx = argmin(res)
+#     return idx, vectors[idx]
+# end
 
-function selectSmoothParameter(Γ::Vector{Vector{Float64}})
-    res = gradStdTest.(Γ)
-    idx = argmin(res)
-    return idx, Γ[idx]
-end
+# function selectSmoothParameter(Γ::Vector{Vector{Float64}})
+#     res = gradStdTest.(Γ)
+#     idx = argmin(res)
+#     return idx, Γ[idx]
+# end
 
 function whichTSType(s::String)
     vec = parse.(Int, split(s, ['(', ',', ')'])[2:3])
@@ -113,6 +113,31 @@ function isdRegularGraph(g::T, d::Int) where T <: AbstractGraph
     return reduce(*, degree(g) .== d)
 end
 
+function interpolateParams(Γ::Vector{T}) where T <: Real
+    p = length(Γ) ÷ 2
+
+    γ = @view Γ[1:2:2p]
+    β = @view Γ[2:2:2p]
+
+    itp_γ = cubic_spline_interpolation(1:p, γ)
+    itp_β = cubic_spline_interpolation(1:p, β)
+
+    return itp_γ, itp_β
+end
+
+function getSmoothnessOfCurve(Γ::Vector{T}) where T<:Real
+    intp_γ, intp_β = interpolateParams(Γ)
+    fγ(x::T) where T<:Real = abs2(Interpolations.hessian(intp_γ, x)[1])
+    fβ(x::T) where T<:Real = abs2(Interpolations.hessian(intp_β, x)[1])
+
+    p  = Float64(length(Γ) ÷ 2)
+    p0 = 1.0
+    Iγ, _ = quadgk(fγ, p0, p)
+    Iβ, _ = quadgk(fγ, p0, p)
+
+    return Iγ, Iβ
+end
+
 function selectBestParams(eDict::Dict{String, Vector{Float64}}, pDict::Dict{String, Vector{Vector{Float64}}}, k::Int; sigdigits=6)
     # first, process the energies #
     kth_smallest_idx = findkthSmallestEnergy(reduce(hcat, values(eDict)), k; sigdigits = sigdigits)
@@ -149,3 +174,30 @@ function findkthSmallestEnergy(arr::AbstractArray, k::Int; sigdigits=6)
     return row_col_indices
 end
 
+"""
+    getEquivalentClasses(vec::Vector{T}; sigdigits = 5) where T <: Real
+
+Computes the equivalence classes of the elements of the input vector `vec`
+The elements are rounded to a certain number of significant digits (default is 5) to group the states with approximately equal values.
+
+# Arguments
+* `vec::Vector{T<:Real}`
+* `sigdigits=5`: Significant digits to which energies are rounded.
+
+# Returns
+* `data_states::Dict{Float64, Vector{Int}}`: Keys are unique elements (rounded) and values corresponds to the index of elements with the same key.
+"""
+function getEquivalentClasses(vec::Vector{T}; sigdigits = 5) where T <: Real
+    dictUniqueElements = Dict{Float64, Vector{Int}}()
+    temp_element = 0.0
+    
+    for (i, elem) in enumerate(vec)
+        temp_element = round(elem, sigdigits=sigdigits)
+        if haskey(dictUniqueElements, temp_element)
+            push!(dictUniqueElements[temp_element], i)
+        else
+            dictUniqueElements[temp_element] = [i]
+        end
+    end
+    return dictUniqueElements 
+end

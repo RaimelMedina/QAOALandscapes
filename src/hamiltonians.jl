@@ -62,7 +62,7 @@ end
 #####################################################################
 
 function getElementMaxCutHam(x::Int, graph::T) where T <: AbstractGraph
-    val = 0.
+    val = ComplexF64(0)
     for i ∈ edges(graph)
         i_elem = ((x>>(i.src-1))&1)
         j_elem = ((x>>(i.dst-1))&1)
@@ -86,7 +86,7 @@ function HzzDiag(g::T) where T <: AbstractGraph
 end
 
 function getElementMixingHam(x::Int, graph::T) where T <: AbstractGraph
-    val = 0.
+    val = ComplexF64(0)
     N   = nv(graph)
     for i=1:N
         i_elem = ((x>>(i-1))&1)
@@ -104,7 +104,7 @@ this is more efficient. In practice, if the system size is ``N``, the correspond
 """
 function HxDiag(g::T) where T <: AbstractGraph
     result = ThreadsX.map(x->getElementMixingHam(x, g), 0:2^nv(g)-1)
-	return result
+	return ComplexF64.(result)
 end
 
 # Let us also define a function that given a dictionary of "interaction" terms (keys)

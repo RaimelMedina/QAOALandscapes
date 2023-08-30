@@ -133,7 +133,7 @@ function gad(qaoa::QAOA, init_point::Vector{T}; niter = 500, η=0.01, tol=1e-5) 
     
     point_temp = copy(init_point)
     
-    point_history = []
+    point_history = Vector[]
     energ_history = Float64[]
     grad_history  = Float64[]
     

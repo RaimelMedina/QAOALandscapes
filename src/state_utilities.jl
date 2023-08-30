@@ -1,61 +1,39 @@
 """
-    getGroundStateProjection(qaoa::QAOA, params, gsIndex::Vector{Int64})
+    getStateProjection(qaoa::QAOA, params, stateIndex::Vector{Int64})
 
-Calculates the projection of the QAOA state onto the ground state (GS) subspace and its orthogonal complement. 
+Calculates the projection of the QAOA state onto the state subspace determined by `gsIndex`. It also returns the corresponding orthogonal complement. 
 The QAOA state is determined by the given parameters `params`.
 
 # Arguments
 * `qaoa::QAOA`: QAOA object.
 * `params`: Parameters determining the QAOA state.
-* `gsIndex::Vector{Int64}`: Indices of the ground state components.
+* `stateIndex::Vector{Int64}`: Indices of the ground state components.
 
 # Returns
-* `normGS`: Norm of the projection of the QAOA state onto the ground state subspace.
-* `normGS_perp`: Norm of the projection of the QAOA state onto the orthogonal complement of the ground state subspace.
-* `ψGS`: Normalized projection of the QAOA state onto the ground state subspace.
-* `ψGS_perp`: Normalized projection of the QAOA state onto the orthogonal complement of the ground state subspace.
+* `normState`: Norm of the projection of the QAOA state onto the state subspace given by `stateIndex`.
+* `normState_perp`: Norm of the projection of the QAOA state onto the orthogonal complement of the specificied state subspace.
+* `ψIndex`: Normalized projection of the QAOA state onto the state subspace.
+* `ψIndex_perp`: Normalized projection of the QAOA state onto the orthogonal complement of the state subspace.
 """
-function getGroundStateProjection(qaoa::QAOA, params, gsIndex::Vector{Int64})
+function getStateProjection(qaoa::QAOA, params, gsIndex::Vector{Int64})
     ψMin  = getQAOAState(qaoa, params)
-    ψGS = sum(map(x->_onehot(x, 2^qaoa.N)*ψMin[x], gsIndex))[:]
+    ψ = sum(map(x->_onehot(x, 2^qaoa.N)*ψMin[x], gsIndex))[:]
 
-    normGS = norm(ψGS)
-    normalize!(ψGS)
+    normState = norm(ψ)
+    normalize!(ψ)
 
-    ψGS_perp    = ψMin - (ψGS' * ψMin)*ψGS
-    normGS_perp = norm(ψGS_perp)
-    normalize!(ψGS_perp)
+    ψ_perp    = ψMin - (ψ' * ψMin)*ψ
+    normState_perp = norm(ψ_perp)
+    normalize!(ψ_perp)
 
-    return normGS, normGS_perp, ψGS, ψGS_perp
-end
-
-"""
-    getStateEquivClasses(qaoa::QAOA)
-
-Computes the equivalence classes of states based on their energies in the QAOA problem. 
-The energies are rounded to a certain number of significant digits (default is 5) to group the states with approximately equal energies.
-
-# Arguments
-* `qaoa::QAOA`: QAOA object.
-* `ham=qaoa.HC`: Hamiltonian used to construct the energy-equivalence classes.
-* `sigdigits=5`: Significant digits to which energies are rounded.
-
-# Returns
-* `data_states::Vector{Vector{Int64}}`: Each inner vector contains the indices of the states belonging to the same energy equivalence class.
-"""
-function getStateEquivClasses(qaoa::QAOA; ham=qaoa.HC, sigdigits=5)
-    unique_energies = round.(ham, sigdigits=sigdigits) |> unique |> sort
-    data_states = Vector{Vector{Int64}}()
-    for x ∈ unique_energies
-        push!(data_states, findall(s->isapprox(s, x), ham))
-    end
-    return data_states
+    return normState, normState_perp, ψ, ψ_perp
 end
 
 """
     computationalBasisWeights(ψ, equivClasses)
 
 Computes the computational basis weights for a given state vector `ψ` according to the provided equivalence classes, by summing up the squared magnitudes of the elements with the same equivalence class.
+Here `ψ` and `equivClasses` are ment to live in the same Hilbert space basis. 
 
 # Arguments
 * `ψ`: The state vector.
@@ -66,4 +44,38 @@ Computes the computational basis weights for a given state vector `ψ` according
 """
 function computationalBasisWeights(ψ, equivClasses)
     return map(x-> sum(abs2.(getindex(ψ, x))), equivClasses)
+end
+
+function getSmallestEigenvalues(qaoa::QAOA)
+    @assert typeof(qaoa.hamiltonian) <: Vector 
+    min_energy = minimum(qaoa.hamiltonian |> real)
+    return min_energy, findall(x->isapprox(real(x), min_energy), qaoa.hamiltonian)
+end
+
+function getSmallestEigenvalues(qaoa::QAOA, k::Int; which = :SR)
+    typeHam = typeof(qaoa.hamiltonian)
+    if typeHam <: Vector
+        println("Returning eigenvalues with position of eigenvectors in the computational basis")
+        perm = partialsortperm(qaoa.hamiltonian |> real, 1:k)
+        return qaoa.hamiltonian[perm] |> real, perm
+    else
+        vals, vecs, info = KrylovKit.eigsolve(qaoa.hamiltonian, k, which)
+        println("A total of num_eigvals = $(info.converged) were found out of $(k) requested")
+        return vals, vecs
+    end
+end
+
+function timeToSolution(qaoa::QAOA, Γ::AbstractVector{T}; pd=0.99) where T <:Real
+    @warn "Here we are assuming that the cost Hamiltonian is classical!"
+    p = length(Γ) ÷ 2
+    
+    γ = @view Γ[1:2:2p]
+    β = @view Γ[2:2:2p]
+
+    total_time = abs.(γ) + abs.(β)
+    _, gsIndex = getSmallestEigenvalues(qaoa)
+    ψ = getQAOAState(qaoa, Γ)
+
+    pgs = computationalBasisWeights(ψ, gsIndex)
+    return total_time * (log(1.0 - pd)/log(1-pgs))
 end

@@ -50,9 +50,55 @@ function gradCostFunctionFourier(qaoa::QAOA, Γu::Vector{Float64})
     return gradΓu
 end
 
-function rollDownFourier(qaoa::QAOA, Γmin::Vector{Float64}; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)))
-    ΓFourier = toFourierParams(fourierInitialization(Γmin))
-    Γmin_fourier, Emin_fourier = optimizeParameters(Val(:Fourier), qaoa, ΓFourier, method=method)
+struct FourierInitialization{T <: Real}
+    params::Vector{Vector{T}}
+    R::Int
+end
+
+function FourierInitialization(qaoa::QAOA, vec::Vector{T}, R::Int) where T<:Real
+    @assert R ≥ 0
+    if R==0
+        return FourierInitialization([fourierInitialization(vec)], 0)
+    else
+        fvec  = toFourierParams(vec)
+        variance_vector = fvec .^ 2
+        mat_fvec = zeros(length(vec), R)
+
+        for i in 1:size(mat_fvec)[1]
+            distrib = Distributions.Normal(0.0, variance_vector[i])
+            mat_fvec[i, :] = fvec[i] .+ rand(distrib, R)
+        end
+
+        for i in 1:R
+            mat_fvec[:, i] .= fromFourierParams(mat_fvec[:, i])
+            toFundamentalRegion!(qaoa, view(mat_fvec, :, i)) 
+        end
+
+        new_params = [fourierInitialization(vec)]
+        for i in 1:R
+            push!(new_params, fourierInitialization(mat_fvec[:, i]))
+        end
+
+        return FourierInitialization{T}(new_params, R)
+    end
+end
+
+# function rollDownFourier(qaoa::QAOA, Γmin::Vector{Float64}; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)))
+#     ΓFourier = toFourierParams(fourierInitialization(Γmin))
+#     Γmin_fourier, Emin_fourier = optimizeParameters(Val(:Fourier), qaoa, ΓFourier, method=method)
+#     return Γmin_fourier, Emin_fourier
+# end
+
+function rollDownFourier(qaoa::QAOA, Γmin::Vector{Float64}, R::Int=1; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)))
+    fourierInitData = FourierInitialization(qaoa, Γmin, R)
+    
+    fourierOptimData = ThreadsX.map(
+        x->optimizeParameters(Val(:Fourier), qaoa, toFourierParams(fourierInitData.params[x]), method=method),
+        1:R+1
+    )
+    E_fourier = [fourierOptimData[x][2] for x in eachindex(fourierOptimData)]
+    Emin_fourier, min_index = findmin(E_fourier)
+    Γmin_fourier = fourierOptimData[min_index][1]
     return Γmin_fourier, Emin_fourier
 end
 
@@ -69,7 +115,7 @@ By default the `BFGS` optimizer is used.
 # Return
 * `result:Dict`. Dictionary with keys being `keys \in [1, pmax]` and values being a `Tuple{Float64, Vector{Float64}}` of cost function value and corresponding parameter.
 """
-function fourierOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)))
+function fourierOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int, R::Int=0; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)))
     listMinima = Dict{Int64, Tuple{Float64, Vector{Float64}}}()
     p = length(Γ0) ÷ 2 
     #Γmin, Emin = optimizeParameters(qaoa, Γ0; settings=settings)
@@ -79,7 +125,7 @@ function fourierOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int; method=Opt
     println("    p=$(p)     | $(round(listMinima[p][1], digits = 7)) | $(norm(gradCostFunction(qaoa, listMinima[p][2])))")
 
     for t = p+1:pmax
-        Γopt, Eopt = rollDownFourier(qaoa, listMinima[t-1][end], method=method)
+        Γopt, Eopt = rollDownFourier(qaoa, listMinima[t-1][end], R, method=method)
         listMinima[t] = (Eopt, Γopt)
         
         println("    p=$(t)     | $(round(Eopt, digits = 7)) | $(norm(gradCostFunction(qaoa, Γopt)))")

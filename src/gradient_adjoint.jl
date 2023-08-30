@@ -4,65 +4,77 @@ Compute the gradient of the QAOA cost function using adjoint (a reverse-mode) di
 proposed in [*this reference*](https://arxiv.org/abs/2009.02823). https://arxiv.org/pdf/2011.02991.pdf
 """
 function gradCostFunction(qaoa::QAOA, params::Vector{T}) where T<: Real
-    λ = getQAOAState(qaoa, params)
-    ϕ = copy(λ)
-    if typeof(qaoa.hamiltonian) <: Vector
-        λ .= qaoa.hamiltonian .* λ
-    else
-        λ .= qaoa.hamiltonian * λ
-    end
-    μ = similar(λ)
-    #costFun = dot(ϕ, λ) |> real
+    # this will update/populate qaoa.state which we will call |λ⟩ following the paper
+    getQAOAState!(qaoa, params)
+    
+    # |ϕ⟩ := |λ⟩
+    ϕ = copy(qaoa.state)
+
+    # |λ⟩ := H |λ⟩
+    Hzz_ψ!(qaoa, qaoa.state)
+    
+    # now we allocate |μ⟩
+    μ = similar(qaoa.state)
+
     gradResult = zeros(T, length(params))
+    
     for i ∈ length(params):-1:1
+        # |ϕ⟩ ← (Uᵢ)†|ϕ⟩    
         applyQAOALayerAdjoint!(qaoa, params, i, ϕ)
+        
+        # |μ⟩ ← |ϕ⟩
         μ .= ϕ
+
+        # |μ⟩ ← dUᵢ/dθᵢ |μ⟩
         applyQAOALayerDerivative!(qaoa, params, i, μ)
-        gradResult[i] = 2.0*real(dot(λ, μ))
+        
+        # ∇Eᵢ = 2 ℜ ⟨ λ | μ ⟩
+        gradResult[i] = 2.0*real(dot(qaoa.state, μ))
         if i > 1
-            applyQAOALayerAdjoint!(qaoa, params, i, λ)
+            #|λ⟩ ← (Uᵢ)†|λ⟩
+            applyQAOALayerAdjoint!(qaoa, params, i)
         end
     end 
     return gradResult
 end
 
-function applyQAOALayerAdjoint!(qaoa::QAOA, params::Vector{T}, pos::Int, state::Vector{Complex{T}}) where T<: Real
-    if isodd(pos)
-        # γ-type parameter
-        state .= exp.(im * params[pos] * qaoa.HC) .* state
-    else
-        # β-type parameter
-        QAOALandscapes.fwht!(state, qaoa.N)
-        state .= exp.(im * params[pos] * qaoa.HB) .* state
-        QAOALandscapes.ifwht!(state, qaoa.N)
-    end
-end
+# function applyQAOALayerAdjoint!(qaoa::QAOA, params::Vector{T}, pos::Int, state::Vector{Complex{T}}) where T<: Real
+#     if isodd(pos)
+#         # γ-type parameter
+#         state .= exp.(im * params[pos] * qaoa.HC) .* state
+#     else
+#         # β-type parameter
+#         QAOALandscapes.fwht!(state, qaoa.N)
+#         state .= exp.(im * params[pos] * qaoa.HB) .* state
+#         QAOALandscapes.ifwht!(state, qaoa.N)
+#     end
+# end
 
-function applyQAOALayer!(qaoa::QAOA, params::Vector{T}, pos::Int, state::Vector{Complex{T}}) where T<: Real
-    if isodd(pos)
-        # γ-type parameter
-        state .= exp.(-im * params[pos] * qaoa.HC) .* state
-    else
-        # β-type parameter
-        QAOALandscapes.fwht!(state, qaoa.N)
-        state .= exp.(-im * params[pos] * qaoa.HB) .* state
-        QAOALandscapes.ifwht!(state, qaoa.N)
-    end
-end
+# function applyQAOALayer!(qaoa::QAOA, params::Vector{T}, pos::Int, state::Vector{Complex{T}}) where T<: Real
+#     if isodd(pos)
+#         # γ-type parameter
+#         state .= exp.(-im * params[pos] * qaoa.HC) .* state
+#     else
+#         # β-type parameter
+#         QAOALandscapes.fwht!(state, qaoa.N)
+#         state .= exp.(-im * params[pos] * qaoa.HB) .* state
+#         QAOALandscapes.ifwht!(state, qaoa.N)
+#     end
+# end
 
-function applyQAOALayerDerivative!(qaoa::QAOA, params::Vector{T}, pos::Int, state::Vector{Complex{T}}) where T<: Real
-    if isodd(pos)
-        # γ-type parameter
-        state .= exp.(-im * params[pos] * qaoa.HC) .* state
-        state .= (-im .* qaoa.HC) .* state
-    else
-        # β-type parameter
-        QAOALandscapes.fwht!(state, qaoa.N)
-        state .= exp.(-im * params[pos] * qaoa.HB) .* state
-        state .= (-im .* qaoa.HB) .* state
-        QAOALandscapes.ifwht!(state, qaoa.N)
-    end
-end
+# function applyQAOALayerDerivative!(qaoa::QAOA, params::Vector{T}, pos::Int, state::Vector{Complex{T}}) where T<: Real
+#     if isodd(pos)
+#         # γ-type parameter
+#         state .= exp.(-im * params[pos] * qaoa.HC) .* state
+#         state .= (-im .* qaoa.HC) .* state
+#     else
+#         # β-type parameter
+#         QAOALandscapes.fwht!(state, qaoa.N)
+#         state .= exp.(-im * params[pos] * qaoa.HB) .* state
+#         state .= (-im .* qaoa.HB) .* state
+#         QAOALandscapes.ifwht!(state, qaoa.N)
+#     end
+# end
 
 @doc raw"""
     geometricTensor(qaoa::QAOA, params::Vector{T}, ψ0::AbstractVector{Complex{T}}) where T<: Real

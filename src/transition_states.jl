@@ -61,10 +61,10 @@ can be restricted even further to the ``[-\pi/4, \pi/4]`` interval (see [`here`]
 Finally, when dealing with regular graphs with odd degree `\gamma` paramaters can be brought to the ``[-\pi/4, \pi/4]`` interval.
 This function modifies inplace the initial input vector ``Γ``. 
 """
-function toFundamentalRegion!(qaoa::QAOA, Γ::Vector{Float64})
+function toFundamentalRegion!(qaoa::QAOA, Γ::AbstractVector{T}) where T<:Real
     p = length(Γ) ÷ 2
-    β = Γ[2:2:2p]
-    γ = Γ[1:2:2p]
+    β = view(Γ, 2:2:2p)
+    γ = view(Γ, 1:2:2p)
     
     # First, folding β ∈ [-π/4, π/4]
     for i=1:p #beta angles come first, they are between -pi/4, pi/4
@@ -94,8 +94,6 @@ function toFundamentalRegion!(qaoa::QAOA, Γ::Vector{Float64})
             end
         end
     end
-    Γ[2:2:2p] = β
-    Γ[1:2:2p] = γ
     return nothing
 end
 
@@ -123,15 +121,15 @@ that the obtained vectors have lower energy than the initial vector `Γmin`
 # Return
 * `result:Tuple`. The returned paramaters are as follows => `Γmin_m, Γmin_p, Emin_m, Emin_p, info_m, info_p`
 """
-function rollDownfromTS(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; ϵ=0.001, tsType="symmetric", method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)))
+function rollDownfromTS(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; ϵ=0.001, tsType="symmetric", method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)), diffMode=:adjoint)
     ΓTs = transitionState(Γmin, ig, tsType=tsType)
     umin = getNegativeHessianEigvec(qaoa, Γmin, ig, tsType=tsType)["eigvec_approx"]
     
     Γ0_p = ΓTs + ϵ*umin
     Γ0_m = ΓTs - ϵ*umin
     
-    Γmin_p, Emin_p = optimizeParameters(qaoa, Γ0_p; method=method);
-    Γmin_m, Emin_m = optimizeParameters(qaoa, Γ0_m; method=method);
+    Γmin_p, Emin_p = optimizeParameters(qaoa, Γ0_p; method=method, diffMode=diffMode);
+    Γmin_m, Emin_m = optimizeParameters(qaoa, Γ0_m; method=method, diffMode=diffMode);
     
     return [Γmin_m, Γmin_p, [Emin_m, Emin_p]]
 end

@@ -57,9 +57,9 @@ using Base.Threads
 using Combinatorics
 using KrylovKit
 
-function setRandomSeed(seed::Int)
-    Random.seed!(seed)
-end
+# function setRandomSeed(seed::Int)
+#     Random.seed!(seed)
+# end
 
 include("qaoa.jl")
 include("layers.jl")

@@ -42,10 +42,10 @@ end
 
 function Base.show(io::IO, qaoa::QAOA)
     str = "QAOA object with: 
-    number of qubits = $(qaoa.N),
-    "
+    number of qubits = $(qaoa.N)."
     if qaoa.parity_symmetry
-        str2 = "Z₂ parity symmetry"
+        str2 = "
+        Z₂ parity symmetry"
         print(io, str * str2)
     else
         print(io, str)

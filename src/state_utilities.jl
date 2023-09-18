@@ -66,16 +66,17 @@ function getSmallestEigenvalues(qaoa::QAOA, k::Int; which = :SR)
 end
 
 function timeToSolution(qaoa::QAOA, Γ::AbstractVector{T}; pd=0.99) where T <:Real
-    @warn "Here we are assuming that the cost Hamiltonian is classical!"
+    @debug "Here we are assuming that the cost Hamiltonian is classical!"
     p = length(Γ) ÷ 2
     
     γ = @view Γ[1:2:2p]
     β = @view Γ[2:2:2p]
 
-    total_time = abs.(γ) + abs.(β)
+    total_time = sum(abs.(γ) + abs.(β))
     _, gsIndex = getSmallestEigenvalues(qaoa)
     ψ = getQAOAState(qaoa, Γ)
 
     pgs = computationalBasisWeights(ψ, gsIndex)
-    return total_time * (log(1.0 - pd)/log(1-pgs))
+
+    return total_time * (log(1.0 - pd)/log(1-sum(pgs)))
 end

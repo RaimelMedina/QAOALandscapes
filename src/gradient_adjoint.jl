@@ -5,16 +5,16 @@ proposed in [*this reference*](https://arxiv.org/abs/2009.02823). https://arxiv.
 """
 function gradCostFunction(qaoa::QAOA, params::Vector{T}) where T<: Real
     # this will update/populate qaoa.state which we will call |λ⟩ following the paper
-    getQAOAState!(qaoa, params)
+    λ = getQAOAState(qaoa, params)
     
     # |ϕ⟩ := |λ⟩
-    ϕ = copy(qaoa.state)
+    ϕ = copy(λ)
 
     # |λ⟩ := H |λ⟩
-    Hzz_ψ!(qaoa, qaoa.state)
+    Hzz_ψ!(qaoa, λ)
     
     # now we allocate |μ⟩
-    μ = similar(qaoa.state)
+    μ = similar(λ)
 
     gradResult = zeros(T, length(params))
     
@@ -29,10 +29,10 @@ function gradCostFunction(qaoa::QAOA, params::Vector{T}) where T<: Real
         applyQAOALayerDerivative!(qaoa, params, i, μ)
         
         # ∇Eᵢ = 2 ℜ ⟨ λ | μ ⟩
-        gradResult[i] = 2.0*real(dot(qaoa.state, μ))
+        gradResult[i] = 2.0*real(dot(λ, μ))
         if i > 1
             #|λ⟩ ← (Uᵢ)†|λ⟩
-            applyQAOALayerAdjoint!(qaoa, params, i)
+            applyQAOALayerAdjoint!(qaoa, params, i, λ)
         end
     end 
     return gradResult

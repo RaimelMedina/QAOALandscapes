@@ -51,7 +51,7 @@ function HzzDiagSymmetric(g::T) where T <: AbstractGraph
     return matZZ
 end
 
-function HzzDiagSymmetric(edge::T) where T <: AbstractEdge
+function HzzDiagSymmetric(g::T1, edge::T2) where {T1<:AbstractGraph, T2 <: AbstractEdge}
     N = nv(g)
     matZZ = zeros(ComplexF64, 2^(N-1));
     for j ∈ 0:2^(N-1)-1
@@ -137,8 +137,7 @@ being the spins participating in a given interaction and values given by the wei
 # Returns
 - `hamiltonian::Vector{Float64}`: The general ``p`` spin Hamiltonian.
 """
-function generalClassicalHamiltonian(interaction_dict::Dict{Vector{Int64}, Float64})
-    n = reduce(vcat, collect(keys(interaction_dict))) |> Set |> length
+function generalClassicalHamiltonian(n::Int, interaction_dict::Dict{Vector{Int}, Float64})
     return ThreadsX.map(x->getElementGeneralClassicalHam(x, interaction_dict), 0:2^n-1)
 end
 

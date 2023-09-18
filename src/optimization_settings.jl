@@ -135,6 +135,25 @@ function optimizeParametersSlice(qaoa::QAOA, ΓTs::Vector{Float64}, u::Vector{Fl
     return f_vals, x_vals
 end
 
+function optimizeEnergyVariance(
+    qaoa::QAOA, params::AbstractVector{T};
+    method = Optim.BFGS(linesearch = Optim.BackTracking(order=3)),
+    printout=false) where T<:Real
+
+    f(x::AbstractVector{T}) where T<:Real = energyVariance(qaoa, x)
+    result = Optim.optimize(f, params, method = method, autodiff = :forward)
+    
+    parameters = Optim.minimizer(result)
+    cost       = Optim.minimum(result)
+
+    toFundamentalRegion!(qaoa, parameters)
+    if printout
+        gradientNorm = norm(gradCostFunction(qaoa, parameters))
+        print("Optimization with final energy variance value varΓ(E)=$(cost), and gradient norm |∇E|=$(gradientNorm)")
+    end
+    return parameters, cost
+end
+
 @doc raw"""
     getInitParameter(qaoa::QAOA; spacing = 0.01, gradTol = 1e-6)
 

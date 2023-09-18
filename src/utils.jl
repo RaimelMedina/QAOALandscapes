@@ -187,17 +187,30 @@ The elements are rounded to a certain number of significant digits (default is 5
 # Returns
 * `data_states::Dict{Float64, Vector{Int}}`: Keys are unique elements (rounded) and values corresponds to the index of elements with the same key.
 """
-function getEquivalentClasses(vec::Vector{T}; sigdigits = 5) where T <: Real
+function getEquivalentClasses(vec::Vector{T}; rounding=false, sigdigits = 5) where T <: Real
+    println("Rounding of the elements is set to $(rounding)")
+
     dictUniqueElements = Dict{Float64, Vector{Int}}()
     temp_element = 0.0
-    
-    for (i, elem) in enumerate(vec)
-        temp_element = round(elem, sigdigits=sigdigits)
-        if haskey(dictUniqueElements, temp_element)
-            push!(dictUniqueElements[temp_element], i)
-        else
-            dictUniqueElements[temp_element] = [i]
+    if rounding
+        for (i, elem) in enumerate(vec)
+            temp_element = round(elem, sigdigits=sigdigits)
+            if haskey(dictUniqueElements, temp_element)
+                push!(dictUniqueElements[temp_element], i)
+            else
+                dictUniqueElements[temp_element] = [i]
+            end
+        end
+    else
+        for (i, elem) in enumerate(vec)
+            temp_element = elem
+            if haskey(dictUniqueElements, temp_element)
+                push!(dictUniqueElements[temp_element], i)
+            else
+                dictUniqueElements[temp_element] = [i]
+            end
         end
     end
-    return dictUniqueElements 
+    data = collect(values(dictUniqueElements))[sortperm(collect(keys(dictUniqueElements)))]
+    return data 
 end

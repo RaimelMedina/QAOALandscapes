@@ -150,9 +150,9 @@ function gad(qaoa::QAOA, init_point::Vector{T}; niter = 500, η=0.01, tol=1e-5) 
         point_temp .+= η*(-grad + 2*dot(grad, v_hess)*v_hess)
         toFundamentalRegion!(qaoa, point_temp)
         
-        push!(point_temp, point_history)
-        push!(qaoa(point_temp), energ_history)
-        push!(gradCostFunction(qaoa, point_temp) |> norm, grad_history)
+        push!(point_history, point_temp)
+        push!(energ_history, qaoa(point_temp), )
+        push!(grad_history, gradCostFunction(qaoa, point_temp) |> norm)
 
         if grad_history[end] <= tol
             println("Algorithm converged at iteration iter=$(i)")

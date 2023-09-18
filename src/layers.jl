@@ -129,12 +129,12 @@ function applyQAOALayerDerivative!(qaoa::QAOA, params::Vector{T}, pos::Int, stat
         
         # state .= Hx_ψ(state; parity_symmetry = qaoa.parity_symmetry)
         # state .*= -1.0*im
-        QAOALandscapes.fwht!(state, qaoa.N)
-        state .= exp.(-im * params[pos] * qaoa.HB) .* state
-        state .= (-im .* qaoa.HB) .* state
-        QAOALandscapes.ifwht!(state, qaoa.N)
-        # applyExpHB!(state, params[pos]; parity_symmetry=qaoa.parity_symmetry)
-        # Hx_ψ!(qaoa, state)
-        # state .*= -1.0*im
+        # QAOALandscapes.fwht!(state, qaoa.N)
+        # state .= exp.(-im * params[pos] * qaoa.HB) .* state
+        # state .= (-im .* qaoa.HB) .* state
+        # QAOALandscapes.ifwht!(state, qaoa.N)
+        applyExpHB!(state, params[pos]; parity_symmetry=qaoa.parity_symmetry)
+        Hx_ψ!(qaoa, state)
+        state .*= -1.0*im
     end
 end

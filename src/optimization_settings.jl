@@ -190,6 +190,8 @@ function getInitialParameter(qaoa::QAOA; method=Optim.BFGS(linesearch = Optim.Ba
     if gradNormGridMin > gradTol
         newParams, newEnergy = optimizeParameters(qaoa, Γ, method=method)
         println("Convergence reached. Energy = $(newEnergy), |∇E| = $(norm(gradCostFunction(qaoa, newParams)))")
+        return energy, newParams, newEnergy
+    else
+        return energy, Γ, energy[pos]
     end
-    return energy, newParams, newEnergy
 end

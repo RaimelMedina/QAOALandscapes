@@ -1,8 +1,8 @@
 function Hx_ψ!(qaoa::QAOA, psi::Vector{Complex{T}}) where T
     N = length(psi)
-    @assert qaoa.N == N
-    
     num_qubits = Int(log2(N))
+    @assert qaoa.N == num_qubits
+    
     result = zeros(Complex{T}, N)
 
     for qubit in 1:num_qubits
@@ -82,7 +82,7 @@ end
 
 
 function applyExpHC!(q::QAOA, γ::T, ψ0::Vector{Complex{T}}) where T<:Real
-    ψ0 .*= exp.(-im * (γ .* q.HC)) .* ψ0
+    ψ0 .= exp.(-im * (γ .* q.HC)) .* ψ0
 end
 
 # function applyQAOALayer!(q::QAOA, Γ::Vector{T}, index::Int) where T<:Real
@@ -129,12 +129,12 @@ function applyQAOALayerDerivative!(qaoa::QAOA, params::Vector{T}, pos::Int, stat
         
         # state .= Hx_ψ(state; parity_symmetry = qaoa.parity_symmetry)
         # state .*= -1.0*im
-        # QAOALandscapes.fwht!(state, qaoa.N)
-        # state .= exp.(-im * params[pos] * qaoa.HB) .* state
-        # state .= (-im .* qaoa.HB) .* state
-        # QAOALandscapes.ifwht!(state, qaoa.N)
-        applyExpHB!(state, params[pos]; parity_symmetry=qaoa.parity_symmetry)
-        Hx_ψ!(qaoa, state)
-        state .*= -1.0*im
+        QAOALandscapes.fwht!(state, qaoa.N)
+        state .= exp.(-im * params[pos] * qaoa.HB) .* state
+        state .= (-im .* qaoa.HB) .* state
+        QAOALandscapes.ifwht!(state, qaoa.N)
+        # applyExpHB!(state, params[pos]; parity_symmetry=qaoa.parity_symmetry)
+        # Hx_ψ!(qaoa, state)
+        # state .*= -1.0*im
     end
 end

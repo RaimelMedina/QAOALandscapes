@@ -3,24 +3,49 @@ function Hx_ψ!(qaoa::QAOA, psi::Vector{Complex{T}}) where T
     num_qubits = Int(log2(N))
     @assert qaoa.N == num_qubits
     
-    result = zeros(Complex{T}, N)
+    result = copy(psi)
 
     for qubit in 1:num_qubits
         mask = 1 << (qubit - 1)
         for index in 0:(N-1)
             if (index & mask) == 0
-                result[index + 1] += psi[index + 1 + mask]
+                psi[index + 1] += result[index + 1 + mask]
             else
-                result[index + 1] += psi[index + 1 - mask]
+                psi[index + 1] += result[index + 1 - mask]
             end
         end
     end
     if qaoa.parity_symmetry
-        for i ∈ 1:N÷2
-            result[i] += result[N-i+1]
+        for l ∈ 1:N÷2
+            psi[l] += result[N-l+1]
+            psi[N-l+1] += result[l]
         end
     end
-    return result
+    return nothing
+end
+
+function X(qaoa::QAOA, ψ::Vector{Complex{T}}, i::Int) where T
+    if qaoa.parity_symmetry
+        @assert i ≤ qaoa.N + 1
+    else
+        @assert i ≤ qaoa.N
+    end
+
+    if qaoa.parity_symmetry && i==qaoa.N+1
+        return reverse(ψ)
+    else
+        psi = copy(ψ)
+        dim = length(ψ)
+        mask = 1 << (i - 1)
+        for index in 0:(dim-1)
+            if (index & mask) == 0
+                psi[index + 1] = psi[index + 1 + mask]
+            else
+                psi[index + 1] = psi[index + 1 - mask]
+            end
+        end
+        return psi
+    end
 end
 
 function Hzz_ψ!(qaoa::QAOA, psi::Vector{Complex{T}}) where T<:Real
@@ -64,36 +89,11 @@ function applyExpHB!(psi::Vector{Complex{T}}, β::T; parity_symmetry=false) wher
     return nothing
 end
 
-# function applyExpHC!(q::QAOA, γ::T) where T<:Real
-#     q.state .= exp.(-im * (γ .* q.HC)) .* q.state
-# end
-
-# function applyExp_paral(ψ::Vector{Complex{T}}, γ::T, hc::Vector{Complex{T}}) where T<:Real
-#     @assert size(ψ) == size(hc)
-#     Threads.@threads for i ∈ eachindex(ψ)
-#         ψ[i] *= exp(-im * γ *  hc[i])
-#     end
-# end
-
-# function applyExp(ψ::Vector{Complex{T}}, γ::T, hc::Vector{Complex{T}}) where T<:Real
-#     @assert size(ψ) == size(hc)
-#     ψ .*= exp.(-im * γ *  hc)
-# end
-
-
 function applyExpHC!(q::QAOA, γ::T, ψ0::Vector{Complex{T}}) where T<:Real
     ψ0 .= exp.(-im * (γ .* q.HC)) .* ψ0
 end
 
-# function applyQAOALayer!(q::QAOA, Γ::Vector{T}, index::Int) where T<:Real
-#     if isodd(index) #γ-type indexes
-#         applyExpHC!(q, Γ[index])
-#     else
-#         applyExpHB!(q.state, Γ[index]; parity_symmetry = q.parity_symmetry)
-#     end
-# end
-
-function applyQAOALayer!(q::QAOA, Γ::Vector{T}, index::Int, ψ0::Vector{Complex{T}}) where T<:Real
+function applyQAOALayer!(q::QAOA, Γ::AbstractVector{T}, index::Int, ψ0::Vector{Complex{T}}) where T<:Real
     if isodd(index)
         applyExpHC!(q, Γ[index], ψ0)
     else
@@ -101,15 +101,7 @@ function applyQAOALayer!(q::QAOA, Γ::Vector{T}, index::Int, ψ0::Vector{Complex
     end
 end
 
-# function applyQAOALayerAdjoint!(q::QAOA, Γ::Vector{T}, index::Int) where T<:Real
-#     if isodd(index)
-#         applyExpHC!(q, -Γ[index])
-#     else
-#         applyExpHB!(q.state, -Γ[index]; parity_symmetry = q.parity_symmetry)
-#     end
-# end
-
-function applyQAOALayerAdjoint!(q::QAOA, Γ::Vector{T}, index::Int, ψ0::Vector{Complex{T}}) where T<:Real
+function applyQAOALayerAdjoint!(q::QAOA, Γ::AbstractVector{T}, index::Int, ψ0::Vector{Complex{T}}) where T<:Real
     if isodd(index)
         applyExpHC!(q, -Γ[index], ψ0) 
     else
@@ -117,7 +109,7 @@ function applyQAOALayerAdjoint!(q::QAOA, Γ::Vector{T}, index::Int, ψ0::Vector{
     end
 end
 
-function applyQAOALayerDerivative!(qaoa::QAOA, params::Vector{T}, pos::Int, state::Vector{Complex{T}}) where T<: Real
+function applyQAOALayerDerivative!(qaoa::QAOA, params::AbstractVector{T}, pos::Int, state::Vector{Complex{T}}) where T<: Real
     if isodd(pos)
         # γ-type parameter
         applyExpHC!(qaoa, params[pos], state)
@@ -125,16 +117,13 @@ function applyQAOALayerDerivative!(qaoa::QAOA, params::Vector{T}, pos::Int, stat
         state .*= -1.0*im
     else
         # β-type parameter
-        # applyExpHB!(state, params[pos]; parity_symmetry = qaoa.parity_symmetry)
-        
-        # state .= Hx_ψ(state; parity_symmetry = qaoa.parity_symmetry)
-        # state .*= -1.0*im
+        applyExpHB!(state, params[pos]; parity_symmetry=qaoa.parity_symmetry)
+        Hx_ψ!(qaoa, state)
+        state .*= -1.0*im
+        # β-type parameter
         # QAOALandscapes.fwht!(state, qaoa.N)
         # state .= exp.(-im * params[pos] * qaoa.HB) .* state
         # state .= (-im .* qaoa.HB) .* state
         # QAOALandscapes.ifwht!(state, qaoa.N)
-        applyExpHB!(state, params[pos]; parity_symmetry=qaoa.parity_symmetry)
-        Hx_ψ!(qaoa, state)
-        state .*= -1.0*im
     end
 end

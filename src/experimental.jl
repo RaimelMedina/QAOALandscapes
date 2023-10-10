@@ -11,6 +11,7 @@ mutable struct Node <: AbstractVector{Float64}
     id::Int64
     value::Vector{Float64}
 end
+ 
 Base.size(s::Node) = size(s.value)
 Base.length(s::Node) = length(s.value)
 Base.getindex(s::Node, i...) = getindex(s.value, i...)

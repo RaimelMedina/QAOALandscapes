@@ -28,6 +28,7 @@ export goemansWilliamson
 # Benchmark with respect to Harvard hard harvard instance
 export harvardGraph
 
+using Revise
 using Graphs
 using ForwardDiff
 using Random
@@ -51,6 +52,7 @@ function setRandomSeed(seed::Int)
 end
 
 include("qaoa.jl")
+include("data_wrapper.jl")
 include("layers.jl")
 include("hamiltonians.jl")
 include("hessian_tools.jl")

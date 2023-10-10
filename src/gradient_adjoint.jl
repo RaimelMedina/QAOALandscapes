@@ -3,7 +3,7 @@
 Compute the gradient of the QAOA cost function using adjoint (a reverse-mode) differentiation. We implement the algorithm 
 proposed in [*this reference*](https://arxiv.org/abs/2009.02823). https://arxiv.org/pdf/2011.02991.pdf
 """
-function gradCostFunction(qaoa::QAOA, params::Vector{T}) where T<: Real
+function gradCostFunction(qaoa::QAOA, params::AbstractVector{T}) where T<: Real
     # this will update/populate qaoa.state which we will call |λ⟩ following the paper
     λ = getQAOAState(qaoa, params)
     
@@ -37,45 +37,7 @@ function gradCostFunction(qaoa::QAOA, params::Vector{T}) where T<: Real
     end 
     return gradResult
 end
-
-# function applyQAOALayerAdjoint!(qaoa::QAOA, params::Vector{T}, pos::Int, state::Vector{Complex{T}}) where T<: Real
-#     if isodd(pos)
-#         # γ-type parameter
-#         state .= exp.(im * params[pos] * qaoa.HC) .* state
-#     else
-#         # β-type parameter
-#         QAOALandscapes.fwht!(state, qaoa.N)
-#         state .= exp.(im * params[pos] * qaoa.HB) .* state
-#         QAOALandscapes.ifwht!(state, qaoa.N)
-#     end
-# end
-
-# function applyQAOALayer!(qaoa::QAOA, params::Vector{T}, pos::Int, state::Vector{Complex{T}}) where T<: Real
-#     if isodd(pos)
-#         # γ-type parameter
-#         state .= exp.(-im * params[pos] * qaoa.HC) .* state
-#     else
-#         # β-type parameter
-#         QAOALandscapes.fwht!(state, qaoa.N)
-#         state .= exp.(-im * params[pos] * qaoa.HB) .* state
-#         QAOALandscapes.ifwht!(state, qaoa.N)
-#     end
-# end
-
-# function applyQAOALayerDerivative!(qaoa::QAOA, params::Vector{T}, pos::Int, state::Vector{Complex{T}}) where T<: Real
-#     if isodd(pos)
-#         # γ-type parameter
-#         state .= exp.(-im * params[pos] * qaoa.HC) .* state
-#         state .= (-im .* qaoa.HC) .* state
-#     else
-#         # β-type parameter
-#         QAOALandscapes.fwht!(state, qaoa.N)
-#         state .= exp.(-im * params[pos] * qaoa.HB) .* state
-#         state .= (-im .* qaoa.HB) .* state
-#         QAOALandscapes.ifwht!(state, qaoa.N)
-#     end
-# end
-
+ 
 @doc raw"""
     geometricTensor(qaoa::QAOA, params::Vector{T}, ψ0::AbstractVector{Complex{T}}) where T<: Real
 Compute the geometricTensor of the QAOA cost function using adjoint (a reverse-mode) differentiation. We implement the algorithm 

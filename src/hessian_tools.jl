@@ -1,37 +1,22 @@
-function elementHessianCostFunction(qaoa::QAOA, Γ::Vector{Float64}, idx::Vector{Int64}; ϵ=cbrt(eps(Float64)))
-    γIdx, βIdx = idx[1], idx[2]
-    p   = length(Γ) ÷ 2      
-    uγ  = _onehot(γIdx, 2p)*ϵ
-    uβ  = _onehot(βIdx, 2p)*ϵ 
+function elementHessianCostFunction(qaoa::QAOA, Γ::Vector{Float64}, idx::Vector{Int64})
+    ψ = getQAOAState(qaoa, Γ)
+    ψRow    = ∂ψ(qaoa, Γ, idx[1])
+    ψCol    = ∂ψ(qaoa, Γ, idx[2])
+    ψRowCol = ∂ψ(qaoa, Γ, idx[1], idx[2])
 
-    if γIdx==βIdx
-        hessianElement = (
-            -1.0*qaoa(Γ+2uβ)-
-            1.0*qaoa(Γ-2uβ)+
-            16*qaoa(Γ+uβ)+
-            16*qaoa(Γ-uβ) -
-            30*qaoa(Γ)
-        )/(12.0*ϵ^2)
-    else
-        hessianElement = (
-            -1.0*qaoa(Γ+2uβ+2uγ) + 16*qaoa(Γ+uβ+uγ)+
-            1.0*qaoa(Γ+2uβ-2uγ) - 16*qaoa(Γ+uβ-uγ)+
-            1.0*qaoa(Γ-2uβ+2uγ) - 16*qaoa(Γ-uβ+uγ)-
-            1.0*qaoa(Γ-2uβ-2uγ) + 16*qaoa(Γ-uβ-uγ)
-        )/(48.0*ϵ^2)
-    end
+    hessianElement = 2*real(dot(ψRow, qaoa.HC .* ψCol)) + 2*real(dot(ψ, qaoa.HC .* ψRowCol))
     return hessianElement
 end
 
 @doc raw"""
-    getNegativeHessianEigval(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric", ϵ=cbrt(eps(Float64)))
+    getNegativeHessianEigval(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric")
 
 Computes the approximation to the minimum (negative) eigenvalue of the Hessian at the TS obtained by padding with zeros
 the local minimum `Γmin`. The transition state is completely specified by the index of the γ component `ig`, and the 
 type of transition states (`"symmetric"` or `"non_symmetric"`). The cost of obtaining this approximate eigenvalue is basically
 the cost of computing two matrix elements of a Hessian.
 """
-function getNegativeHessianEigval(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric", ϵ=cbrt(eps(Float64)))
+function getNegativeHessianEigval(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric")
     ΓTs = transitionState(Γmin, ig, tsType=tsType)
     p    = length(Γmin) ÷ 2
     
@@ -42,7 +27,7 @@ function getNegativeHessianEigval(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; t
     bbar = 0.0
 
     if tsType=="symmetric"
-        b = elementHessianCostFunction(qaoa, ΓTs, [γIdx[ig], βIdx[ig]], ϵ=ϵ)
+        b = elementHessianCostFunction(qaoa, ΓTs, [γIdx[ig], βIdx[ig]])
         if (ig != 1 && ig != p+1)
             bbar = b - elementHessianCostFunction(qaoa, Γmin, [γIdx[ig], βIdx[ig-1]])
             bbar /= 2
@@ -50,7 +35,7 @@ function getNegativeHessianEigval(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; t
             bbar = b/sqrt(2)
         end
     elseif tsType=="non_symmetric"
-        b = elementHessianCostFunction(qaoa, ΓTs, [γIdx[ig], βIdx[ig-1]], ϵ=ϵ)
+        b = elementHessianCostFunction(qaoa, ΓTs, [γIdx[ig], βIdx[ig-1]])
         bbar = b - elementHessianCostFunction(qaoa, Γmin, [γIdx[ig-1], βIdx[ig-1]])
         bbar /= 2
     end
@@ -108,7 +93,7 @@ Basically, the last two rows and columns of the transformed Hessian correspond t
 * `permMat::Matrix{Float64}`: Matrix implementing the desired permutation.
 * `HTransformed::Matrix{Float64}`: Transformed Hessian at the transition state. Specifically, we have that ``H_{\mathop{\rm{perm}}}=PHP^{-1}``.
 """
-function permuteHessian(H::AbstractArray{Float64,2}, i::Int; tsType="symmetric", returnHessian=false)
+function permuteHessian(H::AbstractArray{Float64,2}, i::Int; tsType="symmetric")
     dim = size(H)[1]
 
     listOfIndices, permutationMat = permuteHessian(dim ÷ 2, i; tsType=tsType)

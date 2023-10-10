@@ -55,18 +55,22 @@ struct FourierInitialization{T <: Real}
     R::Int
 end
 
-function FourierInitialization(qaoa::QAOA, vec::Vector{T}, R::Int) where T<:Real
+function FourierInitialization(qaoa::QAOA, vec::Vector{T}, R::Int; α=0.6) where T<:Real
     @assert R ≥ 0
     if R==0
         return FourierInitialization([fourierInitialization(vec)], 0)
     else
         fvec  = toFourierParams(vec)
+        
+        # Eq B4 from paper https://browse.arxiv.org/pdf/1812.01041.pdf
         variance_vector = fvec .^ 2
         mat_fvec = zeros(length(vec), R)
 
         for i in 1:size(mat_fvec)[1]
             distrib = Distributions.Normal(0.0, variance_vector[i])
-            mat_fvec[i, :] = fvec[i] .+ rand(distrib, R)
+
+            # Eq. B4 from paper https://browse.arxiv.org/pdf/1812.01041.pdf
+            mat_fvec[i, :] = fvec[i] .+ α*rand(distrib, R)
         end
 
         for i in 1:R
@@ -83,13 +87,7 @@ function FourierInitialization(qaoa::QAOA, vec::Vector{T}, R::Int) where T<:Real
     end
 end
 
-# function rollDownFourier(qaoa::QAOA, Γmin::Vector{Float64}; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)))
-#     ΓFourier = toFourierParams(fourierInitialization(Γmin))
-#     Γmin_fourier, Emin_fourier = optimizeParameters(Val(:Fourier), qaoa, ΓFourier, method=method)
-#     return Γmin_fourier, Emin_fourier
-# end
-
-function rollDownFourier(qaoa::QAOA, Γmin::Vector{Float64}, R::Int=1; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)))
+function rollDownFourier(qaoa::QAOA, Γmin::Vector{T}, R::Int=0; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3))) where T<:Real
     fourierInitData = FourierInitialization(qaoa, Γmin, R)
     
     fourierOptimData = ThreadsX.map(

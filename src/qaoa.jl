@@ -135,7 +135,75 @@ end
 
 Computes the cost function Hessian at the point ``\Gamma`` in parameter space. Currently, we use the [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl) package
 """
-function hessianCostFunction(q::QAOA, Γ::AbstractVector{T}) where T<:Real
-    matHessian = ForwardDiff.hessian(q, Γ)
-    return matHessian
+function hessianCostFunction(qaoa::QAOA, Γ::AbstractVector{T}; diffMode=:manual) where T<:Real
+    if diffMode==:forward
+        matHessian = ForwardDiff.hessian(qaoa, Γ)
+        return matHessian
+    elseif diffMode==:manual
+        p = length(Γ) ÷ 2
+        
+        ψ = getQAOAState(qaoa, Γ)
+        
+        ψCol = similar(ψ)
+        ψRow  = similar(ψ)
+        ψRowCol  = similar(ψ)
+        
+        matHessian = zeros(2p, 2p)
+        for col in 1:2p
+            ψCol .= ∂ψ(qaoa, Γ, col)
+            for row in col:2p
+                ψRow .= ∂ψ(qaoa, Γ, row)
+                ψRowCol .= ∂ψ(qaoa, Γ, col, row)
+                
+                matHessian[row, col] = 2*real(dot(ψRow, qaoa.HC .* ψCol)) + 2*real(dot(ψ, qaoa.HC .* ψRowCol))
+                if col != row
+                    matHessian[col, row] = matHessian[row, col]
+                end
+            end
+        end
+        return matHessian
+    else
+        throw(ArgumentError("diffMode=$(diffMode) not supported. Only ':manual' or ':forward' methods are implemented"))
+    end
+end
+
+function ∂ψ(qaoa::QAOA, Γ::Vector{T}, i::Int) where T<:Real
+    ψ = plus_state(T, qaoa.N)
+    @inbounds @simd for idx ∈ eachindex(Γ)
+        if idx==i
+            applyQAOALayerDerivative!(qaoa, Γ, idx, ψ)
+        else
+            applyQAOALayer!(qaoa, Γ, idx, ψ)
+        end
+    end
+    return ψ
+end
+
+function ∂ψ(qaoa::QAOA, Γ::Vector{T}, i::Int, j::Int) where T<:Real
+    ψ = plus_state(T, qaoa.N)
+    @inbounds @simd for idx ∈ eachindex(Γ)
+        if i==j
+            if idx==i
+                applyQAOALayer!(qaoa, Γ, idx, ψ)
+                if isodd(idx)
+                    Hzz_ψ!(qaoa, ψ)
+                    Hzz_ψ!(qaoa, ψ)
+                    ψ .*= -1.0
+                else
+                    Hx_ψ!(qaoa, ψ)
+                    Hx_ψ!(qaoa, ψ)
+                    ψ .*= -1.0
+                end
+            else
+                applyQAOALayer!(qaoa, Γ, idx, ψ)
+            end
+        else
+            if idx==i || idx==j
+                applyQAOALayerDerivative!(qaoa, Γ, idx, ψ)
+            else
+                applyQAOALayer!(qaoa, Γ, idx, ψ)
+            end
+        end
+    end
+    return ψ
 end

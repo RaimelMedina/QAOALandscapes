@@ -1,3 +1,7 @@
+function plus_state(T::Type{<:Real}, N::Int)
+    return convert(Complex{T}, 2.0^(-N/2)) * ones(Complex{T}, 2^N)
+end
+
 """
     getStateProjection(qaoa::QAOA, params, stateIndex::Vector{Int64})
 

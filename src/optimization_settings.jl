@@ -178,7 +178,7 @@ function getInitialParameter(qaoa::QAOA; method=Optim.BFGS(linesearch = Optim.Ba
     end
     
     energy  = zeros(length(γIndex), length(βIndex))
-    for j in eachindex(βIndex)
+    Threads.@threads for j in eachindex(βIndex)
         for i in eachindex(γIndex)
             energy[i,j] = qaoa([γIndex[i], βIndex[j]])
         end
@@ -190,8 +190,8 @@ function getInitialParameter(qaoa::QAOA; method=Optim.BFGS(linesearch = Optim.Ba
     if gradNormGridMin > gradTol
         newParams, newEnergy = optimizeParameters(qaoa, Γ, method=method)
         println("Convergence reached. Energy = $(newEnergy), |∇E| = $(norm(gradCostFunction(qaoa, newParams)))")
-        return energy, newParams, newEnergy
+        return newParams, newEnergy
     else
-        return energy, Γ, energy[pos]
+        return Γ, energy[pos]
     end
 end

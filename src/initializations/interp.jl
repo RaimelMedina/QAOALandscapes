@@ -69,14 +69,14 @@ function interpOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int; method=Opti
     #Γmin, Emin = optimizeParameters(qaoa, Γ0; settings=settings)
     listMinima[p] = (qaoa(Γ0), Γ0)
 
-    println("Circuit depth \t | Energy \t | gradient norm ")
-    println("p=$(p) \t | $(round(listMinima[p][1], digits = 7)) \t | $(norm(gradCostFunction(qaoa, listMinima[p][2])))")
+    iter = Progress(pmax-p; desc="Optimizing QAOA energy...")
+    # println("Circuit depth \t | Energy \t | gradient norm ")
+    # println("p=$(p) \t | $(round(listMinima[p][1], digits = 7)) \t | $(norm(gradCostFunction(qaoa, listMinima[p][2])))")
 
-    for t = p+1:pmax
+    for t ∈ p+1:pmax
         Γopt, Eopt = rollDownInterp(qaoa, listMinima[t-1][end]; method=method)
         listMinima[t] = (Eopt, Γopt)
-        
-        println("p=$(t) \t | $(round(Eopt, digits = 7)) \t | $(norm(gradCostFunction(qaoa, Γopt)))")
+        next!(iter; showvalues = [(:Circuit_depth, t), (:Energy, Eopt)])
     end
     return listMinima
 end

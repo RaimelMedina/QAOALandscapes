@@ -1,13 +1,3 @@
-function elementHessianCostFunction(qaoa::QAOA, Γ::Vector{Float64}, idx::Vector{Int64})
-    ψ = getQAOAState(qaoa, Γ)
-    ψRow    = ∂ψ(qaoa, Γ, idx[1])
-    ψCol    = ∂ψ(qaoa, Γ, idx[2])
-    ψRowCol = ∂ψ(qaoa, Γ, idx[1], idx[2])
-
-    hessianElement = 2*real(dot(ψRow, qaoa.HC .* ψCol)) + 2*real(dot(ψ, qaoa.HC .* ψRowCol))
-    return hessianElement
-end
-
 @doc raw"""
     getNegativeHessianEigval(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric")
 
@@ -27,16 +17,16 @@ function getNegativeHessianEigval(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; t
     bbar = 0.0
 
     if tsType=="symmetric"
-        b = elementHessianCostFunction(qaoa, ΓTs, [γIdx[ig], βIdx[ig]])
+        b = hessianCostFunction(qaoa, ΓTs, [γIdx[ig], βIdx[ig]])
         if (ig != 1 && ig != p+1)
-            bbar = b - elementHessianCostFunction(qaoa, Γmin, [γIdx[ig], βIdx[ig-1]])
+            bbar = b - hessianCostFunction(qaoa, Γmin, [γIdx[ig], βIdx[ig-1]])
             bbar /= 2
         else      
             bbar = b/sqrt(2)
         end
     elseif tsType=="non_symmetric"
-        b = elementHessianCostFunction(qaoa, ΓTs, [γIdx[ig], βIdx[ig-1]])
-        bbar = b - elementHessianCostFunction(qaoa, Γmin, [γIdx[ig-1], βIdx[ig-1]])
+        b = hessianCostFunction(qaoa, ΓTs, [γIdx[ig], βIdx[ig-1]])
+        bbar = b - hessianCostFunction(qaoa, Γmin, [γIdx[ig-1], βIdx[ig-1]])
         bbar /= 2
     end
     return b, bbar
@@ -200,29 +190,3 @@ function getNegativeHessianEigvec(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; t
     return result
 end
 
-"""
-    getHessianIndex(qaoa::QAOA, Γ::AbstractVector{T}; checks=true, tol=1e-6) where T<:Real
-
-Calculate the Hessian index of a stationary (it checks the gradient norm) point of the QAOA energy function
-
-# Arguments
-- `qaoa`: a QAOA object.
-- `Γ`: a vector of parameters.
-
-# Keyword Arguments
-- `checks=true`: a boolean to decide whether to check if the gradient of the cost function is smaller than a certain tolerance.
-- `tol=1e-6`: a tolerance level for the gradient of the cost function.
-
-# Output
-- Returns the Hessian index, i.e., the number of negative eigenvalues of the Hessian matrix.
-
-# Notes
-The function first calculates the gradient of the cost function for the given `qaoa` and `Γ`. If `checks=true`, it asserts that the norm of this gradient is less than `tol`. It then calculates the Hessian matrix and its eigenvalues, and returns the count of eigenvalues less than zero.
-
-"""
-function getHessianIndex(qaoa::QAOA, Γ::AbstractVector{T}; checks=true, tol=1e-6) where T<:Real
-    checks && norm(gradCostFunction(qaoa, Γ)) < tol : nothing : @warn "Gradient norm is above the tolerance threshold. Check convergence"
-    
-    hessian_eigvals = hessianCostFunction(qaoa, Γ) |> eigvals
-    return count(x->x<0, filter(x -> abs(x) > tol, hessian_eigvals))
-end

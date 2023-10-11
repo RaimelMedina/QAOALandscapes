@@ -24,7 +24,7 @@ function transitionState(Γ::AbstractVector{T}, iγ::Int; tsType="symmetric", re
         throw(ArgumentError("Only 'symmetric' and 'non_symmetric' values are accepted"))
     end
     
-    ΓTS = zeros(2(p+1))
+    ΓTS = zeros(T, 2(p+1))
     ΓTS[2:2:2(p+1)] = β
     ΓTS[1:2:2(p+1)] = γ
 
@@ -52,60 +52,16 @@ function transitionState(Γmin::AbstractVector{T}; regularize=false) where T
 end
 
 @doc raw"""
-    toFundamentalRegion!(qaoa::QAOA, Γ::Vector{Float64})
-
-Implements the symmetries of the QAOA for different graphs. For more detail see the following [`reference`](https://arxiv.org/abs/2209.01159).
-
-For an arbitrary graph, we can restrict both ``\gamma`` and ``\beta`` parameters to the ``[-\pi/2, \pi/2]`` interval. Furthermore, ``\beta`` parameters
-can be restricted even further to the ``[-\pi/4, \pi/4]`` interval (see [`here`](https://journals.aps.org/prx/abstract/10.1103/PhysRevX.10.021067))
-Finally, when dealing with regular graphs with odd degree `\gamma` paramaters can be brought to the ``[-\pi/4, \pi/4]`` interval.
-This function modifies inplace the initial input vector ``Γ``. 
-"""
-function toFundamentalRegion!(qaoa::QAOA, Γ::AbstractVector{T}) where T<:Real
-    p = length(Γ) ÷ 2
-    β = view(Γ, 2:2:2p)
-    γ = view(Γ, 1:2:2p)
-    
-    # First, folding β ∈ [-π/4, π/4]
-    for i=1:p #beta angles come first, they are between -pi/4, pi/4
-        β[i] = mod(β[i], π/2) # folding beta to interval 0, pi/2
-        if β[i] > π/4 # translating it to -pi/4, pi/4 interval
-            β[i] -= π/2
-        end
-    end
-
-    graph_degree = degree(qaoa.graph)
-    isWeightedG  = typeof(qaoa.graph) <: SimpleWeightedGraph
-    if reduce(*, isodd.(graph_degree)) && !isWeightedG 
-        # enter here if each vertex has odd degree d. Assuming regular graphs here :|
-        # also, this only works for unweighted d-regular random graphs 
-        for i=1:p
-            γ[i] = mod(γ[i], π) # processing gammas by folding them to -pi/2, pi/2 interval
-            if γ[i] > π/2
-                γ[i] -= π
-            end
-            if abs(γ[i]) > π/4 # now folding them even more: to -pi/4, pi/4 interval
-                β[i:end] .*= -1 # this requires sign flip of betas!
-                γ[i] -= sign(γ[i])*π/2
-            end
-            if γ[1] < 0 # making angle gamma_1 positive
-                β .*= -1  # by changing the sign of ALL angles
-                γ .*= -1
-            end
-        end
-    end
-    return nothing
-end
-
-@doc raw"""
-    rollDownTS(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; ϵ=0.001, tsType="symmetric")
+    rollDownTS(qaoa::QAOA, Γmin::Vector{T}, ig::Int; ϵ=0.001, tsType="symmetric")
     
 Starting from a local minima we construct a vector corresponding to the transition state specified by `ig`. From there we construct
 two new vectors 
 
 ```math
 \Gamma^0_p = \Gamma_{\rm{TS}} + \epsilon \hat{e}_{\rm{min}},
+```
 
+```math
 \Gamma^0_m = \Gamma_{\rm{TS}} - \epsilon \hat{e}_{\rm{min}} 
 ```
 We then use these two vectors as initial points to carry out the optimization. Following our analytical results we are guarantee
@@ -121,7 +77,11 @@ that the obtained vectors have lower energy than the initial vector `Γmin`
 # Return
 * `result:Tuple`. The returned paramaters are as follows => `Γmin_m, Γmin_p, Emin_m, Emin_p, info_m, info_p`
 """
-function rollDownfromTS(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; ϵ=0.001, tsType="symmetric", method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)), diffMode=:adjoint)
+function rollDownfromTS(qaoa::QAOA, 
+    Γmin::AbstractVector{T}, ig::Int; 
+    ϵ=0.001, tsType="symmetric", method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)), diffMode=:adjoint
+    ) where T<:Real
+
     ΓTs = transitionState(Γmin, ig, tsType=tsType)
     umin = getNegativeHessianEigvec(qaoa, Γmin, ig, tsType=tsType)["eigvec_approx"]
     
@@ -156,34 +116,6 @@ that the obtained vectors have lower energy than the initial vector `Γmin`
 # Return
 * `result:Tuple`. The returned paramaters are as follows => `Γmin_m, Γmin_p, Emin_m, Emin_p, info_m, info_p`
 """
-# function rollDownTS(qaoa::QAOA, Γmin::Vector{Float64}, k::Int; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)), ϵ=0.001, threaded=false)
-#     p                = length(Γmin) ÷ 2
-#     parametersResult = Dict{String, Vector{Vector{Float64}}}()  
-#     energiesResult   = Dict{String, Vector{Float64}}()
-#     dictTS  = Dict{String, Vector{Vector{Float64}}}()
-    
-#     indices = [[(x, "symmetric") for x in 1:p+1]; [(x, "non_symmetric") for x in 2:p+1]]
-
-#     if threaded
-#         ThreadsX.map(pair -> begin
-#         x, tsType = pair
-#         dictTS[string((x, x - (tsType == "non_symmetric")))] = rollDownfromTS(qaoa, Γmin, x; method=method, ϵ=ϵ, tsType=tsType)
-#         end, indices)
-#     else
-#         map(pair -> begin
-#         x, tsType = pair
-#         dictTS[string((x, x - (tsType == "non_symmetric")))] = rollDownfromTS(qaoa, Γmin, x; method=method, ϵ=ϵ, tsType=tsType)
-#         end, indices)
-#     end
-    
-#     for l in keys(dictTS)
-#         parametersResult[l] = dictTS[l][1:2]
-#         energiesResult[l]   = dictTS[l][3]
-#     end
-
-#     return selectBestParams(energiesResult, parametersResult, k)
-# end
-
 function rollDownTS(qaoa::QAOA, Γmin::Vector{Float64}; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)), ϵ=0.001, threaded=false)
     p                = length(Γmin) ÷ 2
     parametersResult = Dict{String, Vector{Vector{Float64}}}()  

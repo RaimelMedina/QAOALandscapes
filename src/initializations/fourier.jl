@@ -24,8 +24,8 @@ function toFourierParams(Γ::Vector{Float64})
     coeffmat = fourierJacobian(p)
     
     Γu          = zeros(2p)
-    Γu[1:2:2p] .= (sin.(coeffmat ./ p)) \ Γ[1:2:2p]
-    Γu[2:2:2p] .= (cos.(coeffmat ./ p)) \ Γ[2:2:2p]
+    Γu[1:2:2p] .= ((2/p)*(sin.(coeffmat ./ p))) * Γ[1:2:2p]
+    Γu[2:2:2p] .= ((2/p)*(cos.(coeffmat ./ p))) * Γ[2:2:2p]
     
     return Γu
 end
@@ -119,14 +119,15 @@ function fourierOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int, R::Int=0; 
     #Γmin, Emin = optimizeParameters(qaoa, Γ0; settings=settings)
     listMinima[p] = (qaoa(Γ0), Γ0)
 
-    println("Circuit depth  | Energy    | gradient norm ")
-    println("    p=$(p)     | $(round(listMinima[p][1], digits = 7)) | $(norm(gradCostFunction(qaoa, listMinima[p][2])))")
+    # println("Circuit depth  | Energy    | gradient norm ")
+    # println("    p=$(p)     | $(round(listMinima[p][1], digits = 7)) | $(norm(gradCostFunction(qaoa, listMinima[p][2])))")
+    iter = Progress(pmax-p; desc="Optimizing QAOA energy...")
 
-    for t = p+1:pmax
+    for t ∈ p+1:pmax
         Γopt, Eopt = rollDownFourier(qaoa, listMinima[t-1][end], R, method=method)
         listMinima[t] = (Eopt, Γopt)
-        
-        println("    p=$(t)     | $(round(Eopt, digits = 7)) | $(norm(gradCostFunction(qaoa, Γopt)))")
+        next!(iter; showvalues = [(:Circuit_depth, t), (:Energy, Eopt)])
+        #println("    p=$(t)     | $(round(Eopt, digits = 7)) | $(norm(gradCostFunction(qaoa, Γopt)))")
     end
     return listMinima
 end

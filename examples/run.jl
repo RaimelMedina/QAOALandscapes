@@ -1,19 +1,16 @@
 using QAOALandscapes
 using JLD2
-
+using ProgressMeter
 
 ############# Reading data ###########
 N     = parse(Int, ARGS[1])
 pmax  = parse(Int, ARGS[2])
 R     = parse(Int, ARGS[3])
-idx   = parse(Int, ARGS[4])
 ######################################
 
 
 lendataSet = Dict(10=>18, 12=>34, 14=>55, 16=>60, 18=>60, 20=>60)
 dir = "../data"
-
-@assert idx ≤ lendataSet[N]
 
 function load_graph_data(dir::String, N::Int)
     keyG   = "graph_list"
@@ -21,8 +18,11 @@ function load_graph_data(dir::String, N::Int)
     return jldopen(fileG)[keyG]
 end
 
-g = load_graph_data(dir, N)[idx]
+iter = Progress(lendataSet[N], desc="Collecting data for graphs of size N=$(N)...")
 
-qaoa_data = QAOALandscapes.QAOAData(g, pmax, R)
-
-jldsave("data_N_$(N)_graph_$(idx)_pmax_$(pmax)_R_$(R).jld2"; qaoa_data)
+for idx in 1:lendataSet[N]
+    g = load_graph_data(dir, N)[idx]
+    qaoa_data = QAOALandscapes.QAOAData(g, pmax, R)
+    jldsave("data_N_$(N)_graph_$(idx)_pmax_$(pmax)_R_$(R).jld2"; qaoa_data)
+    next!(iter; showvalues = [(:instance, idx)])
+end

@@ -53,26 +53,6 @@ end
 getWeight(edge::T) where T<:Graphs.SimpleGraphs.SimpleEdge = 1.0
 getWeight(edge::T) where T<:SimpleWeightedEdge = edge.weight
 
-# function gradStdTest(v::Vector{Float64})
-#     dim = length(v)
-#     Δβ = v[2:2:dim] |> diff
-#     Δγ = v[1:2:dim] |> diff
-#     return mean([std(Δβ), std(Δγ)])
-# end
-
-# function selectSmoothParameter(Γ1::Vector{Float64}, Γ2::Vector{Float64})
-#     vectors = [Γ1, Γ2]
-#     res = gradStdTest.(vectors)
-#     idx = argmin(res)
-#     return idx, vectors[idx]
-# end
-
-# function selectSmoothParameter(Γ::Vector{Vector{Float64}})
-#     res = gradStdTest.(Γ)
-#     idx = argmin(res)
-#     return idx, Γ[idx]
-# end
-
 function whichTSType(s::String)
     vec = parse.(Int, split(s, ['(', ',', ')'])[2:3])
     tsType = (vec[1]==vec[2]) ? "symmetric" : "non_symmetric"

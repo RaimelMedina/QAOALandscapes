@@ -141,3 +141,37 @@ function generalClassicalHamiltonian(n::Int, interaction_dict::Dict{Vector{Int},
     return ThreadsX.map(x->getElementGeneralClassicalHam(x, interaction_dict), 0:2^n-1)
 end
 
+
+function Hx_ψ!(qaoa::QAOA, psi::Vector{Complex{T}}) where T
+    N = length(psi)
+    num_qubits = Int(log2(N))
+    @assert qaoa.N == num_qubits
+    
+    result = copy(psi)
+
+    for qubit in 1:num_qubits
+        mask = 1 << (qubit - 1)
+        for index in 0:(N-1)
+            if (index & mask) == 0
+                psi[index + 1] += result[index + 1 + mask]
+            else
+                psi[index + 1] += result[index + 1 - mask]
+            end
+        end
+    end
+    if qaoa.parity_symmetry
+        for l ∈ 1:N÷2
+            psi[l] += result[N-l+1]
+            psi[N-l+1] += result[l]
+        end
+    end
+    return nothing
+end
+
+function Hzz_ψ!(qaoa::QAOA, psi::Vector{Complex{T}}) where T<:Real
+    if isa(qaoa.hamiltonian, Vector)
+        psi .= qaoa.hamiltonian .* psi
+    else
+        psi .= (qaoa.hamiltonian * psi)
+    end
+end

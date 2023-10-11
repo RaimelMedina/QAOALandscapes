@@ -41,11 +41,15 @@ function optimizeParameters(
     end
     parameters = Optim.minimizer(result)
     cost       = Optim.minimum(result)
+    convergence_info = Optim.converged(result)
 
     toFundamentalRegion!(qaoa, parameters)
-    if printout
-        gradientNorm = norm(gradCostFunction(qaoa, parameters))
-        print("Optimization with final cost function value E=$(cost), and gradient norm |∇E|=$(gradientNorm)")
+    if !convergence_info
+        if qaoa(params) > cost && printout
+            @warn "Optimization did not converged but energy decreased"
+        else
+            throw(AssertionError("Optimization did not converged. Final gradient norm is |∇E|=$(norm(gradCostFunction(qaoa, parameters)))"))
+        end
     end
     return parameters, cost
 end
@@ -82,46 +86,51 @@ function optimizeParameters(::Val{:Fourier}, qaoa::QAOA, params::AbstractVector{
     end
     result = Optim.optimize(f, ∇f!, params, method=method)
     
-    parameters = Optim.minimizer(result)
+    parameters = fromFourierParams(Optim.minimizer(result))
     cost       = Optim.minimum(result)
+    convergence_info = Optim.converged(result)
+    toFundamentalRegion!(qaoa, parameters)
 
-    if printout
-        gradientNorm = gradCostFunctionFourier(qaoa, parameters) |> norm
-        print("Optimization with final cost function value E=$(cost), and gradient norm |∇E|=$(gradientNorm)")
+    if !convergence_info
+        if qaoa(params) > cost && printout
+            @warn "Optimization did not converged but energy decreased"
+        else
+            throw(AssertionError("Optimization did not converged. Final gradient norm is |∇E|=$(norm(gradCostFunction(qaoa, parameters)))"))
+        end
     end
 
-    return fromFourierParams(parameters), cost
+    return parameters, cost
 end
 
 """
-    optimizeParametersSlice(qaoa::QAOA, ΓTs::Vector{Float64}, u::Vector{Float64};
-                            method=Optim.BFGS(linesearch=LineSearches.BackTracking(order=3)))
+    optimizeParametersSlice(qaoa::QAOA, ΓTs::Vector{T}, u::Vector{T};
+                            method=Optim.BFGS(linesearch=LineSearches.BackTracking(order=3))) where T<:Real
 
 Optimize the parameters of the QAOA along the index-1 direction of the transition state `ΓTs`. 
 
 # Arguments
 
 - `qaoa::QAOA`: QAOA instance 
-- `ΓTs::Vector{Float64}`: Initial parameter vector. We assume that `ΓTs` is an index-1 saddle point and the `u` is the index-1 direction
-- `u::Vector{Float64}`: Direction along which the `QAOA` cost function is going to be optimized. 
+- `ΓTs::Vector{T}`: Initial parameter vector. We assume that `ΓTs` is an index-1 saddle point and the `u` is the index-1 direction
+- `u::Vector{T}`: Direction along which the `QAOA` cost function is going to be optimized. 
 - `method`: The optimization method to be used for the parameter optimization.
     Default: `Optim.BFGS(linesearch=LineSearches.BackTracking(order=3))`.
 
 # Returns
 
-- `f_vals::Vector{Float64}`: The minimum objective function values obtained from the optimization process for the negative and positive parameter shift cases.
-- `x_vals::Vector{Vector{Float64}}`: The corresponding parameter values that yield the minimum objective function values.
+- `f_vals::Vector{T}`: The minimum objective function values obtained from the optimization process for the negative and positive parameter shift cases.
+- `x_vals::Vector{Vector{T}}`: The corresponding parameter values that yield the minimum objective function values.
 
 """
-function optimizeParametersSlice(qaoa::QAOA, ΓTs::Vector{Float64}, u::Vector{Float64}; method=Optim.BFGS(linesearch=LineSearches.BackTracking(order=3)))
+function optimizeParametersSlice(qaoa::QAOA, ΓTs::Vector{T}, u::Vector{T}; method=Optim.BFGS(linesearch=LineSearches.BackTracking(order=3))) where T<:Real
     f(x) = qaoa(ΓTs + u*x[1])
     # Set limits of search #
-    lower = [-1.0]
-    upper = [1.0]
+    lower = T.([(-1.0)])
+    upper = T.([1.0])
     
     # Set initial parameters
-    x0_p = [0.01]
-    x0_m = [-0.01]
+    x0_p = T.([0.01])
+    x0_m = T.([-0.01])
     
     # Set inner optimizer #
     inner_optimizer = Optim.BFGS(linesearch=LineSearches.BackTracking(order=3))
@@ -135,27 +144,9 @@ function optimizeParametersSlice(qaoa::QAOA, ΓTs::Vector{Float64}, u::Vector{Fl
     return f_vals, x_vals
 end
 
-function optimizeEnergyVariance(
-    qaoa::QAOA, params::AbstractVector{T};
-    method = Optim.BFGS(linesearch = Optim.BackTracking(order=3)),
-    printout=false) where T<:Real
-
-    f(x::AbstractVector{T}) where T<:Real = energyVariance(qaoa, x)
-    result = Optim.optimize(f, params, method = method, autodiff = :forward)
-    
-    parameters = Optim.minimizer(result)
-    cost       = Optim.minimum(result)
-
-    toFundamentalRegion!(qaoa, parameters)
-    if printout
-        gradientNorm = norm(gradCostFunction(qaoa, parameters))
-        print("Optimization with final energy variance value varΓ(E)=$(cost), and gradient norm |∇E|=$(gradientNorm)")
-    end
-    return parameters, cost
-end
 
 @doc raw"""
-    getInitParameter(qaoa::QAOA; spacing = 0.01, gradTol = 1e-6)
+    getInitialParameter(qaoa::QAOA; spacing = 0.01, gradTol = 1e-6)
 
 Given a `QAOA` object it performs a grid search on a region of the two dimensional space spanned by ``\{ \gamma_1, \beta_1\}``
 The ``\beta_1`` component is in the interval ``[-\pi/4, \pi/4]`` while the ``\gamma_1`` part is in the ``(0, \pi/4]`` for 3RRG
@@ -178,6 +169,7 @@ function getInitialParameter(qaoa::QAOA; method=Optim.BFGS(linesearch = Optim.Ba
     end
     
     energy  = zeros(length(γIndex), length(βIndex))
+    
     Threads.@threads for j in eachindex(βIndex)
         for i in eachindex(γIndex)
             energy[i,j] = qaoa([γIndex[i], βIndex[j]])
@@ -189,7 +181,7 @@ function getInitialParameter(qaoa::QAOA; method=Optim.BFGS(linesearch = Optim.Ba
     gradNormGridMin = norm(gradCostFunction(qaoa, Γ))
     if gradNormGridMin > gradTol
         newParams, newEnergy = optimizeParameters(qaoa, Γ, method=method)
-        println("Convergence reached. Energy = $(newEnergy), |∇E| = $(norm(gradCostFunction(qaoa, newParams)))")
+        println("Convergence reached. Energy = $(newEnergy)")
         return newParams, newEnergy
     else
         return Γ, energy[pos]

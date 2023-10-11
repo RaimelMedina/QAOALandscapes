@@ -14,8 +14,9 @@ function greedyOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int, igamma::Int
     #Γmin, Emin = optimizeParameters(optim, qaoa, Γ0, method=method)
     listMinima[p] = (qaoa(Γ0), Γ0)
 
-    println("Circuit depth  | Energy    | gradient norm ")
-    println("    p=$(p)     | $(round(listMinima[p][1], digits = 7)) | $(norm(gradCostFunction(qaoa, listMinima[p][2])))")
+    # println("Circuit depth  | Energy    | gradient norm ")
+    # println("    p=$(p)     | $(round(listMinima[p][1], digits = 7)) | $(norm(gradCostFunction(qaoa, listMinima[p][2])))")
+    iter = Progress(pmax-p; desc="Optimizing QAOA energy...")
     
     for t ∈ p+1:pmax
         dataGreedy = rollDownfromTS(qaoa, listMinima[t-1][end], igamma; ϵ=ϵ, method=method, tsType=tsType)
@@ -28,7 +29,7 @@ function greedyOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int, igamma::Int
             Γopt = dataGreedy[findmin(dataGreedy[3])[2]]
         end
         listMinima[t] = (Eopt, Γopt)
-        println("    p=$(t)     | $(round(Eopt, digits = 7)) | $(norm(gradCostFunction(qaoa, Γopt)))")
+        next!(iter; showvalues = [(:Circuit_depth, t), (:Energy, Eopt)])
     end
 
     return listMinima
@@ -40,13 +41,14 @@ function greedyOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int; ϵ=0.001, m
     #Γmin, Emin = optimizeParameters(optim, qaoa, Γ0, method=method)
     listMinima[p] = (qaoa(Γ0), Γ0)
 
-    println("Circuit depth  | Energy    | gradient norm ")
-    println("    p=$(p)     | $(round(listMinima[p][1], digits = 7)) | $(norm(gradCostFunction(qaoa, listMinima[p][2])))")
-    
+    # println("Circuit depth  | Energy    | gradient norm ")
+    # println("    p=$(p)     | $(round(listMinima[p][1], digits = 7)) | $(norm(gradCostFunction(qaoa, listMinima[p][2])))")
+    iter = Progress(pmax-p; desc="Optimizing QAOA energy...")
     for t ∈ p+1:pmax
         Eopt, Γopt = greedySelect(qaoa, listMinima[t-1][end]; ϵ=ϵ, method=method, threaded=threaded)
         listMinima[t] = (Eopt, Γopt)
-        println("    p=$(t)     | $(round(Eopt, digits = 7)) | $(norm(gradCostFunction(qaoa, Γopt)))")
+        next!(iter; showvalues = [(:Circuit_depth, t), (:Energy, Eopt)])
+        # println("    p=$(t)     | $(round(Eopt, digits = 7)) | $(norm(gradCostFunction(qaoa, Γopt)))")
     end
 
     return listMinima

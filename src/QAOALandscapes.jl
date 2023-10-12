@@ -4,9 +4,8 @@ const OperatorType{T} = Union{SparseMatrixCSC{T, Int}, Vector{T}}
 
 # Functions related to an arbitrary QAOA  
 export QAOA, HxDiag, HxDiagSymmetric, HzzDiag, HzzDiagSymmetric, generalClassicalHamiltonian,  getQAOAState, gradCostFunction, hessianCostFunction, geometricTensor
-export HessianCostFunction, optimizeParameters, optimizeParametersSlice
+export HessianCostFunction, optimizeParameters, optimizeParametersSlice, OptSetup
 export plus_state, getInitialParameter, toFundamentalRegion!
-
 # Functions related to different initialization strategies
 # Interp
 export interpInitialization, rollDownInterp, interpOptimize

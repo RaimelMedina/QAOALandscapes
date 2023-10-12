@@ -87,11 +87,16 @@ function FourierInitialization(qaoa::QAOA, vec::Vector{T}, R::Int; α=0.6) where
     end
 end
 
-function rollDownFourier(qaoa::QAOA, Γmin::Vector{T}, R::Int=0; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3))) where T<:Real
+function rollDownFourier(qaoa::QAOA, 
+    Γmin::Vector{T}, 
+    R::Int=0; 
+    setup=OptSetup()
+    ) where T<:Real
+
     fourierInitData = FourierInitialization(qaoa, Γmin, R)
     
     fourierOptimData = ThreadsX.map(
-        x->optimizeParameters(Val(:Fourier), qaoa, toFourierParams(fourierInitData.params[x]), method=method),
+        x->optimizeParameters(Val(:Fourier), qaoa, toFourierParams(fourierInitData.params[x]), setup=setup),
         1:R+1
     )
     E_fourier = [fourierOptimData[x][2] for x in eachindex(fourierOptimData)]
@@ -113,8 +118,14 @@ By default the `BFGS` optimizer is used.
 # Return
 * `result:Dict`. Dictionary with keys being `keys \in [1, pmax]` and values being a `Tuple{Float64, Vector{Float64}}` of cost function value and corresponding parameter.
 """
-function fourierOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int, R::Int=0; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)))
-    listMinima = Dict{Int64, Tuple{Float64, Vector{Float64}}}()
+function fourierOptimize(qaoa::QAOA, 
+    Γ0::Vector{T}, 
+    pmax::Int, 
+    R::Int=0; 
+    setup=OptSetup()
+    ) where T<:Real
+
+    listMinima = Dict{Int64, Tuple{T, Vector{T}}}()
     p = length(Γ0) ÷ 2 
     #Γmin, Emin = optimizeParameters(qaoa, Γ0; settings=settings)
     listMinima[p] = (qaoa(Γ0), Γ0)
@@ -124,7 +135,7 @@ function fourierOptimize(qaoa::QAOA, Γ0::Vector{Float64}, pmax::Int, R::Int=0; 
     iter = Progress(pmax-p; desc="Optimizing QAOA energy...")
 
     for t ∈ p+1:pmax
-        Γopt, Eopt = rollDownFourier(qaoa, listMinima[t-1][end], R, method=method)
+        Γopt, Eopt = rollDownFourier(qaoa, listMinima[t-1][end], R, setup=setup)
         listMinima[t] = (Eopt, Γopt)
         next!(iter; showvalues = [(:Circuit_depth, t), (:Energy, Eopt)])
         #println("    p=$(t)     | $(round(Eopt, digits = 7)) | $(norm(gradCostFunction(qaoa, Γopt)))")

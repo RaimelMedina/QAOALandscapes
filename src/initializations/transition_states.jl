@@ -78,8 +78,11 @@ that the obtained vectors have lower energy than the initial vector `Γmin`
 * `result:Tuple`. The returned paramaters are as follows => `Γmin_m, Γmin_p, Emin_m, Emin_p, info_m, info_p`
 """
 function rollDownfromTS(qaoa::QAOA, 
-    Γmin::AbstractVector{T}, ig::Int; 
-    ϵ=0.001, tsType="symmetric", method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)), diffMode=:adjoint
+    Γmin::AbstractVector{T}, 
+    ig::Int; 
+    ϵ=0.001, 
+    tsType="symmetric", 
+    setup=OptSetup()
     ) where T<:Real
 
     ΓTs = transitionState(Γmin, ig, tsType=tsType)
@@ -88,8 +91,8 @@ function rollDownfromTS(qaoa::QAOA,
     Γ0_p = ΓTs + ϵ*umin
     Γ0_m = ΓTs - ϵ*umin
     
-    Γmin_p, Emin_p = optimizeParameters(qaoa, Γ0_p; method=method, diffMode=diffMode);
-    Γmin_m, Emin_m = optimizeParameters(qaoa, Γ0_m; method=method, diffMode=diffMode);
+    Γmin_p, Emin_p = optimizeParameters(qaoa, Γ0_p; setup=setup);
+    Γmin_m, Emin_m = optimizeParameters(qaoa, Γ0_m; setup=setup);
     
     return [Γmin_m, Γmin_p, [Emin_m, Emin_p]]
 end
@@ -116,23 +119,28 @@ that the obtained vectors have lower energy than the initial vector `Γmin`
 # Return
 * `result:Tuple`. The returned paramaters are as follows => `Γmin_m, Γmin_p, Emin_m, Emin_p, info_m, info_p`
 """
-function rollDownTS(qaoa::QAOA, Γmin::Vector{Float64}; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)), ϵ=0.001, threaded=false)
+function rollDownTS(qaoa::QAOA, Γmin::Vector{T}; 
+    setup=OptSetup(),
+    ϵ=0.001, 
+    threaded=false
+    ) where T<:Real
+
     p                = length(Γmin) ÷ 2
-    parametersResult = Dict{String, Vector{Vector{Float64}}}()  
-    energiesResult   = Dict{String, Vector{Float64}}()
-    dictTS  = Dict{String, Vector{Vector{Float64}}}()
+    parametersResult = Dict{String, Vector{Vector{T}}}()  
+    energiesResult   = Dict{String, Vector{T}}()
+    dictTS  = Dict{String, Vector{Vector{T}}}()
     
     indices = [[(x, "symmetric") for x in 1:p+1]; [(x, "non_symmetric") for x in 2:p+1]]
 
     if threaded
         ThreadsX.map(pair -> begin
         x, tsType = pair
-        dictTS[string((x, x - (tsType == "non_symmetric")))] = rollDownfromTS(qaoa, Γmin, x; method=method, ϵ=ϵ, tsType=tsType)
+        dictTS[string((x, x - (tsType == "non_symmetric")))] = rollDownfromTS(qaoa, Γmin, x; setup=setup, ϵ=ϵ, tsType=tsType)
         end, indices)
     else
         map(pair -> begin
         x, tsType = pair
-        dictTS[string((x, x - (tsType == "non_symmetric")))] = rollDownfromTS(qaoa, Γmin, x; method=method, ϵ=ϵ, tsType=tsType)
+        dictTS[string((x, x - (tsType == "non_symmetric")))] = rollDownfromTS(qaoa, Γmin, x; setup=setup, ϵ=ϵ, tsType=tsType)
         end, indices)
     end
     

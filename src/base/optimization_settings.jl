@@ -1,3 +1,27 @@
+struct OptSetup{T<:Optim.AbstractOptimizer}
+    method::T
+    options::Union{Optim.Options, Nothing}
+    printout::Bool
+    diff_mode::Symbol
+end
+
+function OptSetup(method::T; printout=true, diff_mode=:adjoint) where T<:Optim.AbstractOptimizer
+    return OptSetup(method, nothing, printout, diff_mode)
+end
+
+function OptSetup(method::T, options::S; printout=true, diff_mode=:adjoint) where {T<:Optim.AbstractOptimizer, S<:Optim.Options}
+    return OptSetup(method, options, printout, diff_mode)
+end
+
+function OptSetup(; printout=true, diff_mode=:adjoint)
+    return OptSetup(
+        Optim.BFGS(linesearch=Optim.BackTracking(order=3)),
+        nothing,
+        printout,
+        diff_mode
+    )
+end
+
 """
     optimizeParameters(qaoa::QAOA, params::AbstractVector{T};
                        method = Optim.BFGS(linesearch = Optim.BackTracking(order=3)),
@@ -25,30 +49,50 @@ result = optimizeParameters(qaoa, params, method=Optim.BFGS(linesearch=Optim.Hag
 ```
 """
 function optimizeParameters(
-    qaoa::QAOA, params::AbstractVector{T};
-    method = Optim.BFGS(linesearch = Optim.BackTracking(order=3)),
-    printout=false, diffMode=:adjoint) where T<:Real
-
-    if diffMode == :adjoint
+    qaoa::QAOA, 
+    params::AbstractVector{T};
+    setup = OptSetup()
+    ) where T<:Real
+    
+    type_optim = typeof(setup.method)
+    @assert in(setup.diff_mode, [:forward, :adjoint, :notdiff])
+    
+    if type_optim <: Optim.SecondOrderOptimizer
+        if isa(setup.options, Nothing)
+            result = Optim.optimize(qaoa, params, setup.method, autodiff = :forward)
+        else
+            result = Optim.optimize(qaoa, params, setup.method, setup.options, autodiff = :forward) 
+        end
+    
+    elseif type_optim <: Optim.FirstOrderOptimizer
         function g!(G,x)
             G .= gradCostFunction(qaoa, x)
         end
-        result = Optim.optimize(qaoa, g!, params, method=method)
-    elseif diffMode == :forward
-        result = Optim.optimize(qaoa, params, method = method, autodiff = diffMode)
+        if isa(setup.options, Nothing)
+            if setup.diff_mode == :forward
+                result = Optim.optimize(qaoa, params, setup.method, autodiff = :forward)
+            elseif setup.diff_mode == :adjoint
+                result = Optim.optimize(qaoa, g!, params, setup.method)
+            else
+                throw(ArgumentError("Need to define an autodiff method for $(setup.method)"))
+            end
+        else
+            result = Optim.optimize(qaoa, g!, params, setup.method, setup.options)
+        end
     else
-        throw(ArgumentError("Wrong diffMode = $(diffMode) given. Supported modes are :adjoint (default) and :forward"))
+        result = Optim.optimize(qaoa, params, setup.method, setup.options)
     end
+
     parameters = Optim.minimizer(result)
     cost       = Optim.minimum(result)
     convergence_info = Optim.converged(result)
 
     toFundamentalRegion!(qaoa, parameters)
     if !convergence_info
-        if qaoa(params) > cost && printout
-            @warn "Optimization did not converged but energy decreased"
-        else
+        if qaoa(params) < cost
             throw(AssertionError("Optimization did not converged. Final gradient norm is |∇E|=$(norm(gradCostFunction(qaoa, parameters)))"))
+        elseif setup.printout
+            println("Optimization did not converged but energy decreased")
         end
     end
     return parameters, cost
@@ -76,26 +120,41 @@ It returns a tuple containing the following information
 * `parameters::Vector{Float64}`: Optimal parameter obtained
 * `cost::Float64`: Value of the cost function for the optimal parameter obtained.
 """
-function optimizeParameters(::Val{:Fourier}, qaoa::QAOA, params::AbstractVector{T};
-    method = Optim.BFGS(linesearch = Optim.BackTracking(order=3)), 
-    printout=false) where T<:Real
+function optimizeParameters(::Val{:Fourier}, 
+    qaoa::QAOA, 
+    params::AbstractVector{T};
+    setup = OptSetup()
+    ) where T<:Real
     
     f(x::Vector{Float64})  = qaoa(fromFourierParams(x))
     function ∇f!(G, x::Vector{Float64}) 
         G .= gradCostFunctionFourier(qaoa, x)
     end
-    result = Optim.optimize(f, ∇f!, params, method=method)
+
+    type_optim = typeof(setup.method)
+    @assert in(setup.diff_mode, [:adjoint, :notdiff])
+    @assert !(type_optim <: Optim.SecondOrderOptimizer)
     
+    if type_optim <: Optim.FirstOrderOptimizer
+        if isa(setup.options, Nothing)
+            result = Optim.optimize(f, ∇f!, params, setup.method)
+        else
+            result = Optim.optimize(f, ∇f!, params, setup.method, setup.options)
+        end
+    else
+        result = Optim.optimize(f, params, setup.method, setup.options)
+    end
+
     parameters = fromFourierParams(Optim.minimizer(result))
     cost       = Optim.minimum(result)
     convergence_info = Optim.converged(result)
     toFundamentalRegion!(qaoa, parameters)
 
     if !convergence_info
-        if qaoa(params) > cost && printout
-            @warn "Optimization did not converged but energy decreased"
-        else
+        if f(params) < cost
             throw(AssertionError("Optimization did not converged. Final gradient norm is |∇E|=$(norm(gradCostFunction(qaoa, parameters)))"))
+        elseif printout
+            println("Optimization did not converged but energy decreased")
         end
     end
 
@@ -157,7 +216,11 @@ We then launch the `QAOA` optimization procedure from the point in the 2-dimensi
 # Returns
 * 3-Tuple containing: 1.) the cost function grid, 2.) the optimal parameter, and 3.) the optimal energy
 """
-function getInitialParameter(qaoa::QAOA; method=Optim.BFGS(linesearch = Optim.BackTracking(order=3)), spacing = 0.01, gradTol = 1e-6)
+function getInitialParameter(qaoa::QAOA; 
+    setup=OptSetup(), 
+    spacing = 0.01, 
+    gradTol = 1e-6
+    )
     βIndex  = collect(-π/4:spacing:π/4)
     
     isWeightedG  = typeof(qaoa.graph) <: SimpleWeightedGraph
@@ -169,7 +232,7 @@ function getInitialParameter(qaoa::QAOA; method=Optim.BFGS(linesearch = Optim.Ba
     end
     
     energy  = zeros(length(γIndex), length(βIndex))
-    
+
     Threads.@threads for j in eachindex(βIndex)
         for i in eachindex(γIndex)
             energy[i,j] = qaoa([γIndex[i], βIndex[j]])
@@ -180,7 +243,7 @@ function getInitialParameter(qaoa::QAOA; method=Optim.BFGS(linesearch = Optim.Ba
 
     gradNormGridMin = norm(gradCostFunction(qaoa, Γ))
     if gradNormGridMin > gradTol
-        newParams, newEnergy = optimizeParameters(qaoa, Γ, method=method)
+        newParams, newEnergy = optimizeParameters(qaoa, Γ, setup=setup)
         println("Convergence reached. Energy = $(newEnergy)")
         return newParams, newEnergy
     else

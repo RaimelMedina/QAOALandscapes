@@ -95,7 +95,38 @@ function rollDownTSWithNode!(dict, qaoa::QAOA, node::Node; sigdigits = 6, thread
     end
 end
 
-function constructPartialOptimizationGraph(qaoa::QAOA, Γ0::Vector{T}, pmax::Int; keep=5, sigdigits=5) where T<:Real
+# function constructPartialOptimizationGraph(qaoa::QAOA, Γ0::Vector{T}, pmax::Int; keep=5, sigdigits=5) where T<:Real
+#     @assert pmax ≥ 3
+#     idSeed=1
+#     node0 = Node([0], generateId(), round.(Γ0, sigdigits=sigdigits))
+
+#     dict = Dict[]
+#     push!(dict, Dict(node0.value => IdNodes(node0.parentId, node0.id)))
+
+#     dict2 = Dict()
+#     rollDownTSWithNode!(dict2, qaoa, node0)
+
+#     push!(dict, dict2)
+
+#     for p ∈ 3:pmax
+#         println("Working with circuit depth p=$(p) -----")
+#         dictNew = Dict()
+#         for k in keys(dict[p-1])
+#             node = Node(dict[p-1][k].parentId, dict[p-1][k].id, k)
+#             rollDownTSWithNode!(dictNew, qaoa, node)
+#         end
+#         curateDict!(qaoa, dictNew)
+#         keepKthBestMinima!(qaoa, dictNew, keep)
+#         push!(dict, dictNew)
+#         println("Finished with p=$(p) -----")
+        
+#     end
+
+#     return dict
+
+# end
+
+function constructOptimizationGraph(qaoa::QAOA, Γ0::Vector{T}, pmax::Int; sigdigits=5) where T<:Real
     @assert pmax ≥ 3
     idSeed=1
     node0 = Node([0], generateId(), round.(Γ0, sigdigits=sigdigits))
@@ -115,8 +146,8 @@ function constructPartialOptimizationGraph(qaoa::QAOA, Γ0::Vector{T}, pmax::Int
             node = Node(dict[p-1][k].parentId, dict[p-1][k].id, k)
             rollDownTSWithNode!(dictNew, qaoa, node)
         end
-        curateDict!(qaoa, dictNew)
-        keepKthBestMinima!(qaoa, dictNew, keep)
+        #curateDict!(qaoa, dictNew)
+        #keepKthBestMinima!(qaoa, dictNew, keep)
         push!(dict, dictNew)
         println("Finished with p=$(p) -----")
         

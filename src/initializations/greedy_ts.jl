@@ -1,9 +1,9 @@
-function greedySelect(qaoa::QAOA, 
+function greedySelect(qaoa::QAOA{T1, T, T3}, 
     Γmin::Vector{T}; 
-    ϵ=0.001, 
+    ϵ=T(0.001), 
     setup=OptSetup(), 
     threaded=false
-    ) where T<:Real
+    ) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
 
     paramResult, energyResult = rollDownTS(qaoa, Γmin; ϵ=ϵ, setup=setup, threaded=threaded)
     # get key of minimum energy #
@@ -14,22 +14,19 @@ function greedySelect(qaoa::QAOA,
     return valMinimum[minIdx], paramResult[keyMinimum][minIdx]
 end
 
-function greedyOptimize(qaoa::QAOA, 
+function greedyOptimize(qaoa::QAOA{T1, T, T3}, 
     Γ0::Vector{T}, 
     pmax::Int, 
     igamma::Int; 
     tsType="symmetric", 
-    ϵ=0.001, 
+    ϵ=T(0.001), 
     setup=OptSetup()
-    ) where T<:Real
+    ) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
 
-    listMinima = Dict{Int64, Tuple{T, Vector{T}}}()
+    listMinima = Dict{Int, Tuple{T, Vector{T}}}()
     p = length(Γ0) ÷ 2
-    #Γmin, Emin = optimizeParameters(optim, qaoa, Γ0, method=method)
     listMinima[p] = (qaoa(Γ0), Γ0)
 
-    # println("Circuit depth  | Energy    | gradient norm ")
-    # println("    p=$(p)     | $(round(listMinima[p][1], digits = 7)) | $(norm(gradCostFunction(qaoa, listMinima[p][2])))")
     iter = Progress(pmax-p; desc="Optimizing QAOA energy...")
     
     for t ∈ p+1:pmax
@@ -43,13 +40,13 @@ function greedyOptimize(qaoa::QAOA,
     return listMinima
 end
 
-function greedyOptimize(qaoa::QAOA, Γ0::Vector{T}, 
-    pmax::Int; ϵ=0.001, 
+function greedyOptimize(qaoa::QAOA{T1, T, T3}, Γ0::Vector{T}, 
+    pmax::Int; ϵ=T(0.001), 
     setup=OptSetup(), 
     threaded=false
-    ) where T<:Real
+    ) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
 
-    listMinima = Dict{Int64, Tuple{T, Vector{T}}}()
+    listMinima = Dict{Int, Tuple{T, Vector{T}}}()
     p = length(Γ0) ÷ 2
     #Γmin, Emin = optimizeParameters(optim, qaoa, Γ0, method=method)
     listMinima[p] = (qaoa(Γ0), Γ0)

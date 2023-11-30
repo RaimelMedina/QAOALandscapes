@@ -22,7 +22,10 @@ harvardDictionary = Dict(
 (13,14)=>0.14
 );
 
-harvardGraph = SimpleWeightedGraph(14)
-for k in keys(harvardDictionary)
-    add_edge!(harvardGraph, k[1], k[2], harvardDictionary[k])
+function harvardGraph(T::Type{<:Real})
+    graph = SimpleWeightedGraph(14)
+    for k in keys(harvardDictionary)
+        add_edge!(graph, k[1], k[2], harvardDictionary[k] |> T)
+    end
+    return graph
 end

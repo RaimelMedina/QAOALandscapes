@@ -30,16 +30,19 @@ can be restricted even further to the ``[-\pi/4, \pi/4]`` interval (see [`here`]
 Finally, when dealing with regular graphs with odd degree `\gamma` paramaters can be brought to the ``[-\pi/4, \pi/4]`` interval.
 This function modifies inplace the initial input vector ``Γ``. 
 """
-function toFundamentalRegion!(qaoa::QAOA, Γ::AbstractVector{T}) where T<:Real
+function toFundamentalRegion!(qaoa::QAOA{T1, T, T3}, 
+    Γ::Vector{T}
+    ) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
+    
     p = length(Γ) ÷ 2
     β = view(Γ, 2:2:2p)
     γ = view(Γ, 1:2:2p)
     
     # First, folding β ∈ [-π/4, π/4]
     for i=1:p #beta angles come first, they are between -pi/4, pi/4
-        β[i] = mod(β[i], π/2) # folding beta to interval 0, pi/2
+        β[i] = T(mod(β[i], π/2)) # folding beta to interval 0, pi/2
         if β[i] > π/4 # translating it to -pi/4, pi/4 interval
-            β[i] -= π/2
+            β[i] -= T(π/2)
         end
     end
 
@@ -49,18 +52,22 @@ function toFundamentalRegion!(qaoa::QAOA, Γ::AbstractVector{T}) where T<:Real
         # enter here if each vertex has odd degree d. Assuming regular graphs here :|
         # also, this only works for unweighted d-regular random graphs 
         for i=1:p
-            γ[i] = mod(γ[i], π) # processing gammas by folding them to -pi/2, pi/2 interval
+            γ[i] = T(mod(γ[i], π))  # processing gammas by folding them to -pi/2, pi/2 interval
             if γ[i] > π/2
-                γ[i] -= π
+                γ[i] -=T(π)
             end
             if abs(γ[i]) > π/4 # now folding them even more: to -pi/4, pi/4 interval
-                β[i:end] .*= -1 # this requires sign flip of betas!
-                γ[i] -= sign(γ[i])*π/2
+                β[i:end] .*= T(-1) # this requires sign flip of betas!
+                γ[i] -= T(sign(γ[i])*π/2)
             end
             if γ[1] < 0 # making angle gamma_1 positive
-                β .*= -1  # by changing the sign of ALL angles
-                γ .*= -1
+                β .*= T(-1)  # by changing the sign of ALL angles
+                γ .*= T(-1)
             end
+        end
+    else
+        for i=1:p
+            γ[i] = T(mod(γ[i] + π, 2π) - π)
         end
     end
     return nothing

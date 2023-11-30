@@ -1,42 +1,56 @@
 @doc raw"""
     QAOA(g::T; applySymmetries=true) where T <: AbstractGraph
-    QAOA(g::T1, ham::OperatorType{T2}; applySymmetries=true) where {T1 <: AbstractGraph, T2}
 
 Constructors for the `QAOA` object.
 """
-struct QAOA{T1 <: AbstractGraph, T2}
+struct QAOA{T1 <: AbstractGraph, T2 <: Real, T3<:AbstractBackend}
     N::Int
     graph::T1
-    HB::AbstractVector{T2}
-    HC::AbstractVector{T2}
-    hamiltonian::OperatorType{T2}
+    HB::AbstractVector{Complex{T2}}
+    HC::AbstractVector{Complex{T2}}
+    initial_state::AbstractVector{Complex{T2}}
     parity_symmetry::Bool
 end
 
-function QAOA(g::T; applySymmetries=true) where T <: AbstractGraph
+function QAOA(T2::Type{<:Real}, g::T1; applySymmetries=true) where T1 <: AbstractGraph
     N = nv(g)
     if applySymmetries==false
-        h = 2.0*HzzDiag(g)
-        T2 = eltype(h)
-        QAOA{T, eltype(h)}(N, g, HxDiag(g), h, h, false)
+        h = 2*HzzDiag(Complex{T2}, g)
+        QAOA{T1, T2, CPUBackend}(N, g, HxDiag(Complex{T2}, g), h, plus_state(CPUBackend, T2, N), false)
     else
-        h = HzzDiagSymmetric(g)
-        T2 = eltype(h)
-        QAOA{T, eltype(h)}(N-1, g, HxDiagSymmetric(g), h, h, true) 
+        h = HzzDiagSymmetric(Complex{T2}, g)
+        QAOA{T1, T2, CPUBackend}(N-1, g, HxDiagSymmetric(Complex{T2}, g), h, plus_state(CPUBackend, T2, N-1), true) 
     end
 end
 
-function QAOA(g::T1, ham::OperatorType{T2}; applySymmetries=true) where {T1 <: AbstractGraph, T2}
+function QAOA(T3::Type{METALBackend}, ::Type{<:Float32}, g::T1; applySymmetries=true) where {T1 <: AbstractGraph}
     N = nv(g)
+    T2 = Float32
     if applySymmetries==false
-        QAOA{T1, T2}(N, g, T2.(HxDiag(g)), T2.(HzzDiag(g)), ham, false)
+        h = MtlArray(2*HzzDiag(Complex{T2}, g))
+        QAOA{T1, T2, METALBackend}(N, g, MtlArray(HxDiag(Complex{T2}, g)), h, plus_state(T3, T2, N), false)
     else
-        QAOA{T1, T2}(N-1, g, T2.(HxDiagSymmetric(g)), T2.(HzzDiagSymmetric(g)), ham, true) 
+        h = MtlArray(HzzDiagSymmetric(Complex{T2}, g))
+        QAOA{T1, T2, METALBackend}(N-1, g, MtlArray(HxDiagSymmetric(Complex{T2}, g)), h, plus_state(T3, T2, N-1), true) 
     end
 end
 
-function Base.show(io::IO, qaoa::QAOA)
-    str = "QAOA object with: 
+function Base.show(io::IO, qaoa::QAOA{T1, T2, T3}) where {T1 <: AbstractGraph, T2<:Real, T3<:METALBackend}
+    str = "QAOA object with:
+    running on the Metal backend, 
+    number of qubits = $(qaoa.N)."
+    if qaoa.parity_symmetry
+        str2 = "
+    Z₂ parity symmetry"
+        print(io, str * str2)
+    else
+        print(io, str)
+    end
+end
+
+function Base.show(io::IO, qaoa::QAOA{T1, T2, T3}) where {T1 <: AbstractGraph, T2<:Real, T3<:CPUBackend}
+    str = "QAOA object with:
+    running on the CPU, 
     number of qubits = $(qaoa.N)."
     if qaoa.parity_symmetry
         str2 = "
@@ -61,29 +75,18 @@ with
 ```
 and ``H_B, H_C`` corresponding to the mixing and cost Hamiltonian correspondingly.
 """
-function getQAOAState(q::QAOA, Γ::AbstractVector{T}) where T <: Real
-    p = length(Γ) ÷ 2
-    ψ = plus_state(T, q.N)
-    
-    @inbounds @simd for i ∈ eachindex(Γ)
+function getQAOAState(q::QAOA{T1, T2, T3}, Γ::Vector{T2}) where {T1 <: AbstractGraph, T2 <: Real, T3<:AbstractBackend}
+    ψ::AbstractVector{Complex{T2}} = copy(q.initial_state)
+    for i in eachindex(Γ)
         applyQAOALayer!(q, Γ[i], i, ψ)
     end
-
     return ψ
 end
 
-function getQAOAState(q::QAOA, Γ::AbstractVector{T}, ψ0::AbstractVector{Complex{T}}) where T <: Real
-    p = length(Γ) ÷ 2
-    
-    γ = @view Γ[1:2:2p]
-    β = @view Γ[2:2:2p]
-    
+function getQAOAState(q::QAOA{T1, T2, T3}, Γ::Vector{T2}, ψ0::AbstractVector{Complex{T2}}) where {T1 <: AbstractGraph, T2 <: Real, T3<:AbstractBackend}
     ψ = copy(ψ0)
-    @inbounds @simd for i ∈ 1:p
-        ψ .= exp.(-im * γ[i] * q.HC) .* ψ
-        fwht!(ψ, q.N)              # Fast Hadamard transformation
-        ψ .= exp.(-im * β[i] * q.HB) .* ψ
-        ifwht!(ψ, q.N)             # inverse Fast Hadamard transformation
+    for i in eachindex(Γ)
+        applyQAOALayer!(q, Γ[i], i, ψ)
     end
     return ψ
 end
@@ -98,27 +101,16 @@ More specifically, it returns the following real number:
     E(\Gamma^p) = \langle \Gamma^p |H_C|\Gamma^p \rangle
 ```
 """
-function (q::QAOA)(Γ::AbstractVector{T}) where T <: Real
-    ψ = getQAOAState(q, Γ)
-    typeHam = typeof(q.hamiltonian)
-    if typeHam <: Vector
-        return real(ψ' * (q.hamiltonian .* ψ))
-    else
-        return real(dot(ψ, q.hamiltonian, ψ))
-    end
+function (q::QAOA{T1, T2, T3})(Γ::Vector{T2}) where {T1 <: AbstractGraph, T2 <: Real, T3 <: AbstractBackend}
+    ψ::AbstractVector{Complex{T2}} = getQAOAState(q, Γ)
+    res::T2 = real(dot(ψ, q.HC .* ψ)) 
+    return res
 end
 
-function energyVariance(q::QAOA, Γ::AbstractVector{T}) where T<:Real
+function energyVariance(q::QAOA{T1, T2, T3}, Γ::Vector{T2}) where {T1 <: AbstractGraph, T2 <: Real, T3 <: AbstractBackend}
     h_mean_squared = q(Γ)^2
     ψ = getQAOAState(q, Γ)
-    
-    typeHam = typeof(q.hamiltonian)
-    
-    if typeHam <: Vector
-        h_squared_mean = dot(ψ, ( q.hamiltonian .^2 ) .* ψ) |> real
-    else
-        h_squared_mean = dot(ψ, (q.hamiltonian^2), ψ) |> real
-    end
+    h_squared_mean = dot(ψ, (q.hamiltonian .^2) .* ψ) |> real
     return h_squared_mean - h_mean_squared
 end
 

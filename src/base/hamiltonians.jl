@@ -1,7 +1,7 @@
 # First, the Hamiltonians correponding to the original QAOA proposal
 # We restrict ourselves to the +1 parity sector of the Hilbert space
 @doc raw"""
-    HxDiagSymmetric(g::T) where T<: AbstractGraph
+    HxDiagSymmetric(T::Type{<:Real}, g::S) where S <: AbstractGraph
 
 Construct the mixing Hamiltonian in the positive (+1) parity sector of the Hilbert space. This means that if the system 
 size is N, then `HxDiagSymmetric` would be a vector of size ``2^{N-1}``. This construction, only makes sense if the cost/problem 
@@ -11,15 +11,15 @@ Hamiltonian ``H_C`` is invariant under the action of the parity operator, that i
     [H_C, \prod_{i=1}^N \sigma^x_i] = 0
 ```
 """
-function HxDiagSymmetric(g::T) where T<: AbstractGraph
+function HxDiagSymmetric(T::Type{Complex{R}}, g::T2) where {R<:Real, T2<: AbstractGraph}
     N = nv(g)
-    Hx_vec = zeros(ComplexF64, 2^(N-1))
+    Hx_vec = zeros(T, 2^(N-1))
     count = 0
     for j ∈ 0:2^(N-1)-1
         if parity_of_integer(j)==0
             count += 1
             for i ∈ 0:N-1
-                Hx_vec[count] += ComplexF64(-2 * (((j >> (i-1)) & 1) ) + 1)
+                Hx_vec[count] += T(-2 * (((j >> (i-1)) & 1) ) + 1)
             end
             Hx_vec[2^(N-1) - count + 1] = - Hx_vec[count]
         end
@@ -40,34 +40,34 @@ Hamiltonian ``H_C`` is invariant under the action of the parity operator, that i
 ```
 Similarly, if the input is an `edge` then it returns the corresponding ``ZZ`` operator.
 """
-function HzzDiagSymmetric(g::T) where T <: AbstractGraph
+function HzzDiagSymmetric(T::Type{Complex{R}}, g::T2) where {R<:Real, T2 <: AbstractGraph}
     N = nv(g)
-    matZZ = zeros(ComplexF64, 2^(N-1));
+    matZZ = zeros(T, 2^(N-1));
     for edge ∈ edges(g)
         for j ∈ 0:2^(N-1)-1
-            matZZ[j+1] += ComplexF64(-2 * (((j >> (edge.src -1)) & 1) ⊻ ((j >> (edge.dst -1)) & 1)) + 1) * getWeight(edge)
+            matZZ[j+1] += T(-2 * (((j >> (edge.src -1)) & 1) ⊻ ((j >> (edge.dst -1)) & 1)) + 1) * getWeight(R, edge)
         end
     end
     return matZZ
 end
 
-function HzzDiagSymmetric(g::T1, edge::T2) where {T1<:AbstractGraph, T2 <: AbstractEdge}
+function HzzDiagSymmetric(T::Type{Complex{R}}, g::T1, edge::T2) where {R<:Real, T1<:AbstractGraph, T2 <: AbstractEdge}
     N = nv(g)
-    matZZ = zeros(ComplexF64, 2^(N-1));
+    matZZ = zeros(T, 2^(N-1));
     for j ∈ 0:2^(N-1)-1
-        matZZ[j+1] += ComplexF64(-2 * (((j >> (edge.src -1)) & 1) ⊻ ((j >> (edge.dst -1)) & 1)) + 1) * getWeight(edge)
+        matZZ[j+1] += T(-2 * (((j >> (edge.src -1)) & 1) ⊻ ((j >> (edge.dst -1)) & 1)) + 1) * getWeight(R, edge)
     end
     return matZZ
 end
 #####################################################################
 
-function getElementMaxCutHam(x::Int, graph::T) where T <: AbstractGraph
-    val = ComplexF64(0)
+function getElementMaxCutHam(T::Type{Complex{R}}, x::Int, graph::T2) where {R<:Real, T2 <: AbstractGraph}
+    val = T(0)
     for i ∈ edges(graph)
         i_elem = ((x>>(i.src-1))&1)
         j_elem = ((x>>(i.dst-1))&1)
         idx = i_elem ⊻ j_elem
-        val += ((-1)^idx)*getWeight(i)
+        val += T(((-1)^idx)*getWeight(R, i))
     end
     return val
 end
@@ -80,17 +80,17 @@ Construct the cost Hamiltonian. If the cost Hamiltonian is invariant under the p
 this is more efficient. In practice, if the system size is ``N``, the corresponding Hamiltonian would be a vector of size ``2^{N-1}``.
 This function instead returs a vector of size ``2^N``. 
 """
-function HzzDiag(g::T) where T <: AbstractGraph
-    result = ThreadsX.map(x->getElementMaxCutHam(x, g), 0:2^nv(g)-1)
+function HzzDiag(T::Type{Complex{R}}, g::T2) where {R<:Real, T2 <: AbstractGraph}
+    result = ThreadsX.map(x->getElementMaxCutHam(T, x, g), 0:2^nv(g)-1)
 	return result/2
 end
 
-function getElementMixingHam(x::Int, graph::T) where T <: AbstractGraph
-    val = ComplexF64(0)
+function getElementMixingHam(T::Type{Complex{R}}, x::Int, graph::T2) where {R<:Real, T2 <: AbstractGraph}
+    val = T(0)
     N   = nv(graph)
     for i=1:N
         i_elem = ((x>>(i-1))&1)
-        val += (-1)^i_elem
+        val += T((-1)^i_elem)
     end
     return val
 end
@@ -102,22 +102,24 @@ Construct the mixing Hamiltonian. If the cost Hamiltonian is invariant under the
 ``\prod_{i=1}^N \sigma^x_i`` it is better to work in the +1 parity sector of the Hilbert space since
 this is more efficient. In practice, if the system size is ``N``, the corresponding Hamiltonianwould be a vector of size ``2^{N-1}``.
 """
-function HxDiag(g::T) where T <: AbstractGraph
-    result = ThreadsX.map(x->getElementMixingHam(x, g), 0:2^nv(g)-1)
-	return ComplexF64.(result)
+function HxDiag(T::Type{Complex{R}}, g::T2) where {R<:Real, T2 <: AbstractGraph}
+    #result = ThreadsX.map(x->getElementMixingHam(T, x, g), 0:2^nv(g)-1)
+    result = ThreadsX.map(x->-getElementMixingHam(T, x, g), 0:2^nv(g)-1)
+    # I changed so that HB → -HB which is the correct Hamiltonian
+	return result
 end
 
 # Let us also define a function that given a dictionary of "interaction" terms (keys)
 # and "weights" (values) constructs the corresponding classical Hamiltonian.
-function getElementGeneralClassicalHam(x::Int, interaction::Vector{Int64}, weight::Float64)
+function getElementGeneralClassicalHam(T::Type{Complex{R}}, x::Int, interaction::Vector{Int}, weight::T2) where {R<:Real, T2 <: Real}
     elements = map(i->((x>>(i-1))&1), interaction)
     idx      = foldl(⊻, elements)
-    val      = ((-1)^idx)*weight
+    val      = T(((-1)^idx)*weight)
     return val
 end
 
-function getElementGeneralClassicalHam(x::Int, interaction_dict::Dict{Vector{Int64}, Float64})
-    val = sum(k->getElementGeneralClassicalHam(x, k, interaction_dict[k]), keys(interaction_dict))
+function getElementGeneralClassicalHam(T::Type{Complex{R}}, x::Int, interaction_dict::Dict{Vector{Int}, T2}) where {R<:Real, T2 <: Real}
+    val = sum(k->getElementGeneralClassicalHam(T, x, k, interaction_dict[k]), keys(interaction_dict))
     return val
 end
 
@@ -137,17 +139,51 @@ being the spins participating in a given interaction and values given by the wei
 # Returns
 - `hamiltonian::Vector{Float64}`: The general ``p`` spin Hamiltonian.
 """
-function generalClassicalHamiltonian(n::Int, interaction_dict::Dict{Vector{Int}, Float64})
-    return ThreadsX.map(x->getElementGeneralClassicalHam(x, interaction_dict), 0:2^n-1)
+function generalClassicalHamiltonian(T::Type{Complex{R}}, n::Int, interaction_dict::Dict{Vector{Int}, T2}) where {R<:Real, T2 <: Real}
+    return ThreadsX.map(x->getElementGeneralClassicalHam(T, x, interaction_dict), 0:2^n-1)
 end
 
 
-function Hx_ψ!(qaoa::QAOA, psi::Vector{Complex{T}}) where T
+function Hx_ψ!(qaoa::QAOA{T1, T2}, psi::Vector{Complex{T2}}) where {T1<:AbstractGraph, T2<:Real}
     N = length(psi)
     num_qubits = Int(log2(N))
     @assert qaoa.N == num_qubits
     
+    #FIXME
+    # multiplied by -1 the whole state
+    psi .*= Complex{T2}(-1)
     result = copy(psi)
+
+    
+    for qubit in 1:num_qubits
+        mask = 1 << (qubit - 1)
+        for index in 0:(N-1)
+            if (index & mask) == 0
+                psi[index + 1] += result[index + 1 + mask]
+            else
+                psi[index + 1] += result[index + 1 - mask]
+            end
+        end
+    end
+    if qaoa.parity_symmetry
+        for l ∈ 1:N÷2
+            psi[l] += result[N-l+1]
+            psi[N-l+1] += result[l]
+        end
+    end
+    return nothing
+end
+
+function Hx_ψ!(qaoa::QAOA{T1, T2}, psi::Vector{Complex{T2}}, result::Vector{Complex{T2}}) where {T1<:AbstractGraph, T2<:Real}
+    N = length(psi)
+    num_qubits = Int(log2(N))
+    @assert qaoa.N == num_qubits
+    
+
+    #FIXME
+    # multiplied by -1 the whole state
+    psi .*= Complex{T2}(-1)
+    result .= psi
 
     for qubit in 1:num_qubits
         mask = 1 << (qubit - 1)
@@ -168,10 +204,10 @@ function Hx_ψ!(qaoa::QAOA, psi::Vector{Complex{T}}) where T
     return nothing
 end
 
-function Hzz_ψ!(qaoa::QAOA, psi::Vector{Complex{T}}) where T<:Real
-    if isa(qaoa.hamiltonian, Vector)
-        psi .= qaoa.hamiltonian .* psi
-    else
-        psi .= (qaoa.hamiltonian * psi)
+
+function Hzz_ψ!(qaoa::QAOA{T1, T2}, psi::Vector{Complex{T2}}) where {T1<:AbstractGraph, T2<:Real}
+    Threads.@threads for i in eachindex(qaoa.HC, psi)
+        psi[i] *= qaoa.HC[i]
     end
+    return nothing
 end

@@ -1,52 +1,52 @@
-function fourierJacobian(p::Int)
-    coeffmat = zeros(p,p)
+function fourierJacobian(T::Type{<:Real}, p::Int)
+    coeffmat = zeros(T, p,p)
     for j ∈ 1:p
         for i ∈ 1:p
-            coeffmat[i,j] = (j-1/2)*(i-1/2)*π
+            coeffmat[i,j] = T((j-1/2)*(i-1/2)*π)
         end
     end
     return coeffmat
 end
 
-function fromFourierParams(Γu::Vector{Float64})
+function fromFourierParams(Γu::Vector{T}) where T<:Real
     p = length(Γu) ÷ 2
-    coeffmat = fourierJacobian(p)
+    coeffmat = fourierJacobian(T, p)
     
-    Γnew          = zeros(2p)
+    Γnew          = zeros(T, 2p)
     Γnew[1:2:2p] .= (sin.(coeffmat ./ p)) * Γu[1:2:2p]
     Γnew[2:2:2p] .= (cos.(coeffmat ./ p)) * Γu[2:2:2p]
     
     return Γnew
 end
 
-function toFourierParams(Γ::Vector{Float64})
+function toFourierParams(Γ::Vector{T}) where T<:Real
     p = length(Γ) ÷ 2
-    coeffmat = fourierJacobian(p)
+    coeffmat = fourierJacobian(T, p)
     
-    Γu          = zeros(2p)
-    Γu[1:2:2p] .= ((2/p)*(sin.(coeffmat ./ p))) * Γ[1:2:2p]
-    Γu[2:2:2p] .= ((2/p)*(cos.(coeffmat ./ p))) * Γ[2:2:2p]
+    Γu          = zeros(T, 2p)
+    Γu[1:2:2p] .= ((2/p)*(sin.(coeffmat ./ p))) * Γ[1:2:2p] |> T
+    Γu[2:2:2p] .= ((2/p)*(cos.(coeffmat ./ p))) * Γ[2:2:2p] |> T
     
     return Γu
 end
 
-function fourierInitialization(Γmin::Vector{Float64})
+function fourierInitialization(Γmin::Vector{T}) where T<:Real
     Γu   = toFourierParams(Γmin)
-    append!(Γu, [0.0, 0.0])
+    append!(Γu, [T(0), T(0)])
     Γnew = fromFourierParams(Γu)
     return Γnew
 end
 
-function gradCostFunctionFourier(qaoa::QAOA, Γu::Vector{Float64})
+function gradCostFunctionFourier(qaoa::QAOA{T1, T}, Γu::Vector{T}) where {T1<:AbstractGraph, T<:Real}
     p     = length(Γu) ÷ 2
     Γ     = fromFourierParams(Γu)
     gradΓ = gradCostFunction(qaoa, Γ)
     
-    coeffmat = fourierJacobian(p)
+    coeffmat = fourierJacobian(T, p)
     
-    gradΓu          = zeros(2p)
-    gradΓu[1:2:2p] .= (sin.(coeffmat ./ p)) * gradΓ[1:2:2p]
-    gradΓu[2:2:2p] .= (cos.(coeffmat ./ p)) * gradΓ[2:2:2p]
+    gradΓu          = zeros(T, 2p)
+    gradΓu[1:2:2p] .= (sin.(coeffmat ./ p)) * gradΓ[1:2:2p] |>
+    gradΓu[2:2:2p] .= (cos.(coeffmat ./ p)) * gradΓ[2:2:2p] |>
     return gradΓu
 end
 
@@ -55,7 +55,7 @@ struct FourierInitialization{T <: Real}
     R::Int
 end
 
-function FourierInitialization(qaoa::QAOA, vec::Vector{T}, R::Int; α=0.6) where T<:Real
+function FourierInitialization(qaoa::QAOA{T1, T, T3}, vec::Vector{T}, R::Int; α=T(0.6)) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
     @assert R ≥ 0
     if R==0
         return FourierInitialization([fourierInitialization(vec)], 0)
@@ -64,13 +64,13 @@ function FourierInitialization(qaoa::QAOA, vec::Vector{T}, R::Int; α=0.6) where
         
         # Eq B4 from paper https://browse.arxiv.org/pdf/1812.01041.pdf
         variance_vector = fvec .^ 2
-        mat_fvec = zeros(length(vec), R)
+        mat_fvec = zeros(T, length(vec), R)
 
         for i in 1:size(mat_fvec)[1]
-            distrib = Distributions.Normal(0.0, variance_vector[i])
+            distrib = Distributions.Normal(T(0), variance_vector[i])
 
             # Eq. B4 from paper https://browse.arxiv.org/pdf/1812.01041.pdf
-            mat_fvec[i, :] = fvec[i] .+ α*rand(distrib, R)
+            mat_fvec[i, :] = fvec[i] .+ α*rand(T, distrib, R)
         end
 
         for i in 1:R
@@ -87,18 +87,26 @@ function FourierInitialization(qaoa::QAOA, vec::Vector{T}, R::Int; α=0.6) where
     end
 end
 
-function rollDownFourier(qaoa::QAOA, 
+function rollDownFourier(qaoa::QAOA{T1, T, T3}, 
     Γmin::Vector{T}, 
     R::Int=0; 
-    setup=OptSetup()
-    ) where T<:Real
+    setup=OptSetup(),
+    threaded=false
+    ) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
 
     fourierInitData = FourierInitialization(qaoa, Γmin, R)
     
-    fourierOptimData = ThreadsX.map(
-        x->optimizeParameters(Val(:Fourier), qaoa, toFourierParams(fourierInitData.params[x]), setup=setup),
-        1:R+1
-    )
+    if threaded
+        fourierOptimData = ThreadsX.map(
+            x->optimizeParameters(Val(:Fourier), qaoa, toFourierParams(fourierInitData.params[x]), setup=setup),
+            1:R+1
+        )
+    else
+        fourierOptimData = map(
+            x->optimizeParameters(Val(:Fourier), qaoa, toFourierParams(fourierInitData.params[x]), setup=setup),
+            1:R+1
+        )
+    end
     E_fourier = [fourierOptimData[x][2] for x in eachindex(fourierOptimData)]
     Emin_fourier, min_index = findmin(E_fourier)
     Γmin_fourier = fourierOptimData[min_index][1]
@@ -118,27 +126,25 @@ By default the `BFGS` optimizer is used.
 # Return
 * `result:Dict`. Dictionary with keys being `keys \in [1, pmax]` and values being a `Tuple{Float64, Vector{Float64}}` of cost function value and corresponding parameter.
 """
-function fourierOptimize(qaoa::QAOA, 
+function fourierOptimize(qaoa::QAOA{T1, T, T3}, 
     Γ0::Vector{T}, 
     pmax::Int, 
     R::Int=0; 
-    setup=OptSetup()
-    ) where T<:Real
+    setup=OptSetup(),
+    threaded=false
+    ) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
 
-    listMinima = Dict{Int64, Tuple{T, Vector{T}}}()
+    listMinima = Dict{Int, Tuple{T, Vector{T}}}()
     p = length(Γ0) ÷ 2 
-    #Γmin, Emin = optimizeParameters(qaoa, Γ0; settings=settings)
+    
     listMinima[p] = (qaoa(Γ0), Γ0)
 
-    # println("Circuit depth  | Energy    | gradient norm ")
-    # println("    p=$(p)     | $(round(listMinima[p][1], digits = 7)) | $(norm(gradCostFunction(qaoa, listMinima[p][2])))")
     iter = Progress(pmax-p; desc="Optimizing QAOA energy...")
 
     for t ∈ p+1:pmax
-        Γopt, Eopt = rollDownFourier(qaoa, listMinima[t-1][end], R, setup=setup)
+        Γopt, Eopt = rollDownFourier(qaoa, listMinima[t-1][end], R, setup=setup, threaded=threaded)
         listMinima[t] = (Eopt, Γopt)
         next!(iter; showvalues = [(:Circuit_depth, t), (:Energy, Eopt)])
-        #println("    p=$(t)     | $(round(Eopt, digits = 7)) | $(norm(gradCostFunction(qaoa, Γopt)))")
     end
     return listMinima
 end

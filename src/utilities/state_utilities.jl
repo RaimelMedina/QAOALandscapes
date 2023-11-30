@@ -1,6 +1,12 @@
-function plus_state(T::Type{<:Real}, N::Int)
-    return convert(Complex{T}, 2.0^(-N/2)) * ones(Complex{T}, 2^N)
+function plus_state(B::Type{<:CPUBackend}, T::Type{<:Real}, N::Int)
+    return fill(Complex{T}(1/sqrt(1<<N)), 1<<N)
 end
+
+function plus_state(B::Type{<:METALBackend}, T::Type{<:Real}, N::Int)
+    return Metal.fill(Complex{T}(1/sqrt(1<<N)), 1<<N)
+end
+
+plus_state(T::Type{<:Real}, N::Int) = plus_state(CPUBackend, T, N)
 
 """
     getStateProjection(qaoa::QAOA, params, stateIndex::Vector{Int64})
@@ -19,14 +25,48 @@ The QAOA state is determined by the given parameters `params`.
 * `ψIndex`: Normalized projection of the QAOA state onto the state subspace.
 * `ψIndex_perp`: Normalized projection of the QAOA state onto the orthogonal complement of the state subspace.
 """
-function getStateProjection(qaoa::QAOA, params, gsIndex::Vector{Int64})
+function getStateProjection(qaoa::QAOA{T1, T, T3}, params::Vector{T}, gsIndex::Vector{Int}) where {T1<:AbstractGraph, T<:Real, T3<:CPUBackend}
     ψMin  = getQAOAState(qaoa, params)
-    ψ = sum(map(x->_onehot(x, 2^qaoa.N)*ψMin[x], gsIndex))[:]
+    ψ = sum(map(x->_onehot(T3, Complex{T}, x, 1<<qaoa.N)*ψMin[x], gsIndex))[:]
 
     normState = norm(ψ)
     normalize!(ψ)
 
-    ψ_perp    = ψMin - (ψ' * ψMin)*ψ
+    ψ_perp    = ψMin - dot(ψ, ψMin)*ψ
+    normState_perp = norm(ψ_perp)
+    normalize!(ψ_perp)
+
+    return normState, normState_perp, ψ, ψ_perp
+end
+
+function getStateProjection(qaoa::QAOA{T1, T, T3}, params::Vector{T}, gsIndex::Vector{Int}) where {T1<:AbstractGraph, T<:Real, T3<:METALBackend}
+    ψMin  = getQAOAState(qaoa, params) # in the GPU
+    gsIndex_gpu = MtlArray(gsIndex)
+
+    ψ = Metal.zeros(T, 1<<qaoa.N)
+    for x ∈ gsIndex_gpu
+        ψ .+= _onehot(T3, Complex{T}, x, 1<<qaoa.N)*ψMin[x]
+    end
+
+    normState = norm(ψ)
+    normalize!(ψ)
+
+    ψ_perp    = ψMin - dot(ψ, ψMin)*ψ
+    normState_perp = norm(ψ_perp)
+    normalize!(ψ_perp)
+
+    return normState, normState_perp, ψ, ψ_perp
+end
+
+
+function getStateProjection(qaoa::QAOA{T1, T, T3}, ψinit::AbstractVector{Complex{T}}, gsIndex::Vector{Int}) where {T1<:AbstractGraph, T<:Real, T3<:CPUBackend}
+    ψMin  = ψinit
+    ψ = sum(map(x->_onehot(T3, Complex{T}, x, 1<<qaoa.N)*ψMin[x], gsIndex))[:]
+
+    normState = norm(ψ)
+    normalize!(ψ)
+
+    ψ_perp    = ψMin - dot(ψ, ψMin)*ψ
     normState_perp = norm(ψ_perp)
     normalize!(ψ_perp)
 
@@ -50,26 +90,53 @@ function computationalBasisWeights(ψ, equivClasses)
     return map(x-> sum(abs2.(getindex(ψ, x))), equivClasses)
 end
 
-function getSmallestEigenvalues(qaoa::QAOA)
-    @assert typeof(qaoa.hamiltonian) <: Vector 
-    min_energy = minimum(qaoa.hamiltonian |> real)
-    return min_energy, findall(x->isapprox(real(x), min_energy), qaoa.hamiltonian)
-end
+# function gsFidelity(qaoa::QAOA{T1, T, T3}, Γ::Vector{T}, gsIndex::Vector{Int}) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
+#     # get ground state positions#
+#     min = minimum(qaoa.HC |> real)
+#     pos = findall(x->isapprox(x, min), qaoa.HC |> real)
+#     ψ   = getQAOAState(qaoa, Γ)
+#     return sum(abs2.(getindex(ψ, pos)))
+# end
 
-function getSmallestEigenvalues(qaoa::QAOA, k::Int; which = :SR)
-    typeHam = typeof(qaoa.hamiltonian)
-    if typeHam <: Vector
-        println("Returning eigenvalues with position of eigenvectors in the computational basis")
-        perm = partialsortperm(qaoa.hamiltonian |> real, 1:k)
-        return qaoa.hamiltonian[perm] |> real, perm
+# function gsFidelity(qaoa::QAOA{T1, T, T3}, Γ::Vector{T}) where {T1<:AbstractGraph, T<:Real, T3<:METALBackend}
+#     # get ground state positions#
+#     min = minimum(qaoa.HC |> real)
+
+#     pos = findall(x->isapprox(x, min), qaoa.HC |> Array |> real)
+#     ψ   = getQAOAState(qaoa, Γ) |> Array
+#     return sum(abs2.(getindex(ψ, pos)))
+# end
+
+function gsFidelity(qaoa::QAOA{T1, T, T3}, Γ::Vector{T}, gsIndex::Vector{Int}) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
+    if T3<:CPUBackend
+        return computationalBasisWeights(getQAOAState(qaoa, Γ), gsIndex)
     else
-        vals, vecs, info = KrylovKit.eigsolve(qaoa.hamiltonian, k, which)
-        println("A total of num_eigvals = $(info.converged) were found out of $(k) requested")
-        return vals, vecs
+        return computationalBasisWeights(getQAOAState(qaoa, Γ), gsIndex |> MtlArray)
     end
 end
 
-function timeToSolution(qaoa::QAOA, Γ::AbstractVector{T}; pd=0.99) where T <:Real
+
+function getSmallestEigenvalues(energy_vec::AbstractVector{Complex{T}}) where T<:Real
+    if typeof(energy_vec) <: MtlArray
+        energy_vec =  Array(energy_vec) .|> real
+    else
+        energy_vec = energy_vec .|> real    
+    end
+    min_energy = minimum(energy_vec)
+    return min_energy, findall(x->isapprox(x, min_energy), energy_vec)
+end
+
+function getSmallestEigenvalues(qaoa::QAOA{T1, T, T3}, k::Int) where {T1<:AbstractGraph, T<:Real, T3<:CPUBackend}
+    println("Returning eigenvalues with position of eigenvectors in the computational basis")
+    perm = partialsortperm(qaoa.HC .|> real, 1:k)
+    return qaoa.HC[perm] |> real, perm
+end
+
+function timeToSolution(qaoa::QAOA{T1, T, T3}, 
+    Γ::Vector{T},
+    gsIndex::Vector{Int}; 
+    pd=T(0.99)) where {T1<:AbstractGraph, T <:Real, T3<:AbstractBackend}
+
     @debug "Here we are assuming that the cost Hamiltonian is classical!"
     p = length(Γ) ÷ 2
     
@@ -77,10 +144,11 @@ function timeToSolution(qaoa::QAOA, Γ::AbstractVector{T}; pd=0.99) where T <:Re
     β = @view Γ[2:2:2p]
 
     total_time = sum(abs.(γ) + abs.(β))
-    _, gsIndex = getSmallestEigenvalues(qaoa)
+    
     ψ = getQAOAState(qaoa, Γ)
 
     pgs = computationalBasisWeights(ψ, gsIndex)
 
-    return total_time * (log(1.0 - pd)/log(1-sum(pgs)))
+    return total_time * (log(1 - pd)/log(1-sum(pgs)))
 end
+

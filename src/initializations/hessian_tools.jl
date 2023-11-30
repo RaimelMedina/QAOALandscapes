@@ -6,28 +6,33 @@ the local minimum `Γmin`. The transition state is completely specified by the i
 type of transition states (`"symmetric"` or `"non_symmetric"`). The cost of obtaining this approximate eigenvalue is basically
 the cost of computing two matrix elements of a Hessian.
 """
-function getNegativeHessianEigval(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric")
+function getNegativeHessianEigval(qaoa::QAOA{T1, T, T3}, 
+    Γmin::Vector{T}, 
+    ig::Int; 
+    tsType="symmetric"
+    ) where {T1 <: AbstractGraph, T<:Real, T3<:AbstractBackend}
+
     ΓTs = transitionState(Γmin, ig, tsType=tsType)
     p    = length(Γmin) ÷ 2
     
     γIdx = 1:2:(2p+2)
     βIdx = 2:2:(2p+2)
 
-    b    = 0.0
-    bbar = 0.0
+    b    = T(0)
+    bbar = T(0)
 
     if tsType=="symmetric"
         b = hessianCostFunction(qaoa, ΓTs, [γIdx[ig], βIdx[ig]])
         if (ig != 1 && ig != p+1)
             bbar = b - hessianCostFunction(qaoa, Γmin, [γIdx[ig], βIdx[ig-1]])
-            bbar /= 2
+            bbar /= T(2)
         else      
-            bbar = b/sqrt(2)
+            bbar = T(b/sqrt(2))
         end
     elseif tsType=="non_symmetric"
         b = hessianCostFunction(qaoa, ΓTs, [γIdx[ig], βIdx[ig-1]])
         bbar = b - hessianCostFunction(qaoa, Γmin, [γIdx[ig-1], βIdx[ig-1]])
-        bbar /= 2
+        bbar /= T(2)
     end
     return b, bbar
 end
@@ -46,13 +51,13 @@ Basically, the last two rows and columns of the transformed Hessian correspond t
 * `listOfIndices::Vector{Int64}`: List of indices correponding to the arrangement of the new basis elements.
 * `permMat::Matrix{Float64}`: Matrix implementing the desired permutation.
 """
-function permuteHessian(depth::Int, i::Int; tsType="symmetric")
+function permuteHessian(T::Type{<:Real}, depth::Int, i::Int; tsType="symmetric")
     dim = 2*depth
 
     γIdx = 1:2:dim
     βIdx = 2:2:dim
 
-    lastIndices = zeros(2)
+    lastIndices = zeros(T, 2)
 
     if tsType == "symmetric"
         lastIndices = [γIdx[i], βIdx[i]] 
@@ -65,7 +70,8 @@ function permuteHessian(depth::Int, i::Int; tsType="symmetric")
     listOfIndices = filter(x->x != lastIndices[1] && x != lastIndices[2], 1:dim)
     append!(listOfIndices, lastIndices)
 
-    return listOfIndices, Matrix{Float64}(I(dim))[listOfIndices, :]
+    perm_mat = sparse(T(1)*I, dim, dim)[listOfIndices, :]
+    return listOfIndices, perm_mat
 end
 
 @doc raw"""
@@ -83,10 +89,10 @@ Basically, the last two rows and columns of the transformed Hessian correspond t
 * `permMat::Matrix{Float64}`: Matrix implementing the desired permutation.
 * `HTransformed::Matrix{Float64}`: Transformed Hessian at the transition state. Specifically, we have that ``H_{\mathop{\rm{perm}}}=PHP^{-1}``.
 """
-function permuteHessian(H::AbstractArray{Float64,2}, i::Int; tsType="symmetric")
+function permuteHessian(H::Matrix{T}, i::Int; tsType="symmetric") where T<:Real
     dim = size(H)[1]
 
-    listOfIndices, permutationMat = permuteHessian(dim ÷ 2, i; tsType=tsType)
+    listOfIndices, permutationMat = permuteHessian(T, dim ÷ 2, i; tsType=tsType)
     return listOfIndices, permutationMat, H[listOfIndices, listOfIndices]
 end
 
@@ -110,16 +116,22 @@ the approximate and true eigenvector
 # Returns
 * `result::Dict` Dictionary with the following keys: `eigvec_approx`, `eigval_approx`. If `doChecks=true` the following additional keys are available: `change_basis`, `eigvec_fidelity` and `eigval_error`
 """
-function getNegativeHessianEigvec(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; tsType="symmetric", doChecks=false)
+function getNegativeHessianEigvec(qaoa::QAOA{T1, T, T3}, 
+    Γmin::Vector{T}, 
+    ig::Int; 
+    tsType="symmetric", 
+    doChecks=false
+    ) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
+    
     p   = length(Γmin) ÷ 2
     dim = 2(p+1)
 
     γIdx = 1:2:dim
     βIdx = 2:2:dim
 
-    RowTransform = Matrix{Int64}(I(dim))
-    ColTransform = Matrix{Float64}(I(dim))
-    vApproximate = zeros(dim)
+    RowTransform = sparse(Int, I, dim, dim)
+    ColTransform = sparse(T, I, dim, dim)
+    vApproximate = spzeros(T, dim)
 
     #now compute the approximation to the eigenvalue :) 
     b, bbar = getNegativeHessianEigval(qaoa, Γmin, ig; tsType=tsType)
@@ -164,9 +176,13 @@ function getNegativeHessianEigvec(qaoa::QAOA, Γmin::Vector{Float64}, ig::Int; t
     else
         throw(ArgumentError("Only 'symmetric' and 'non_symmetric' values are accepted"))
     end
+    # inverse RowTransform by changing the sign of the off-diagonal elements
+    offdiag_indices = filter!(x->x[1] ≠ x[2], findall(!iszero, RowTransform))
+    RowTransform[offdiag_indices] .*= -1
 
-    basisTransformation = inv(RowTransform)*ColTransform
-    _, permMatrix       = permuteHessian(p+1, ig; tsType=tsType)
+    #basisTransformation = inv(RowTransform)*ColTransform
+    basisTransformation = RowTransform*ColTransform
+    _, permMatrix       = permuteHessian(T, p+1, ig; tsType=tsType)
 
     vApproximate = (transpose(permMatrix)*basisTransformation)*vApproximate
     normalize!(vApproximate)

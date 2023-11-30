@@ -11,13 +11,13 @@ and analogously for the ``\beta`` components.
 """
 function interpInitialization(Γ::Vector{T}) where T<:Real
     p = length(Γ) ÷ 2
-    β = Γ[2:2:2p]
-    γ = Γ[1:2:2p]
+    β = @view Γ[2:2:2p]
+    γ = @view Γ[1:2:2p]
     
     βNew = map(x->((x-1)/p)*(x==1 ? 0 : β[x-1]) + ((p-x+1)/p)*(x==p+1 ? 0 : β[x]), 1:p+1)
     γNew = map(x->((x-1)/p)*(x==1 ? 0 : γ[x-1]) + ((p-x+1)/p)*(x==p+1 ? 0 : γ[x]), 1:p+1)
 
-    ΓNew = zeros(2*(p+1))
+    ΓNew = zeros(T, 2*(p+1))
     ΓNew[2:2:2(p+1)] = βNew
     ΓNew[1:2:2(p+1)] = γNew
 
@@ -40,9 +40,9 @@ optimization.
 # Return
 * `result:Tuple`. The first element corresponds to the vector corresponding to which the algorithm converged to, and the second element is correponding energy_history
 """
-function rollDownInterp(qaoa::QAOA, Γmin::Vector{T}; 
+function rollDownInterp(qaoa::QAOA{T1, T, T3}, Γmin::Vector{T}; 
     setup=OptSetup()
-    ) where T<:Real
+    ) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
 
     ΓInterp = interpInitialization(Γmin)
 
@@ -66,21 +66,18 @@ By default the `BFGS` optimizer is used.
 # Return
 * `result:Dict`. Dictionary with keys being `keys \in [1, pmax]` and values being a `Tuple{Float64, Vector{Float64}}` of cost function value and corresponding parameter.
 """
-function interpOptimize(qaoa::QAOA, 
+function interpOptimize(qaoa::QAOA{T1, T, T3}, 
     Γ0::Vector{T}, 
     pmax::Int; 
     setup=OptSetup()
-    ) where T<:Real
+    ) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
 
-    listMinima = Dict{Int64, Tuple{T, Vector{T}}}()
+    listMinima = Dict{T, Tuple{T, Vector{T}}}()
     p = length(Γ0) ÷ 2 
-    #Γmin, Emin = optimizeParameters(qaoa, Γ0; settings=settings)
     listMinima[p] = (qaoa(Γ0), Γ0)
 
     iter = Progress(pmax-p; desc="Optimizing QAOA energy...")
-    # println("Circuit depth \t | Energy \t | gradient norm ")
-    # println("p=$(p) \t | $(round(listMinima[p][1], digits = 7)) \t | $(norm(gradCostFunction(qaoa, listMinima[p][2])))")
-
+    
     for t ∈ p+1:pmax
         Γopt, Eopt = rollDownInterp(qaoa, listMinima[t-1][end]; setup=setup)
         listMinima[t] = (Eopt, Γopt)

@@ -1,6 +1,4 @@
 module QAOALandscapes
-using SparseArrays
-const OperatorType{T} = Union{SparseMatrixCSC{T, Int}, Vector{T}}
 
 # Functions related to an arbitrary QAOA  
 export QAOA, HxDiag, HxDiagSymmetric, HzzDiag, HzzDiagSymmetric, generalClassicalHamiltonian,  getQAOAState, gradCostFunction, hessianCostFunction, geometricTensor
@@ -17,6 +15,7 @@ export transitionState, permuteHessian, getNegativeHessianEigval, getNegativeHes
 export getStationaryPoints, gradSquaredNorm, optimizeGradSquaredNorm, gad
 
 export Node, IdNodes, constructPartialOptimizationGraph
+export TaylorTermsTS, Oϵ_ψ0, ψT2, ψT4, ψHC2
 
 # Some useful Functions
 export spinChain
@@ -25,7 +24,16 @@ export goemansWilliamson
 # Benchmark with respect to Harvard hard harvard instance
 export harvardGraph
 
+
+abstract type AbstractBackend end
+abstract type CPUBackend <: AbstractBackend end
+abstract type METALBackend <: AbstractBackend end
+
+export AbstractBackend, CPUBackend, METALBackend
+
+using Metal
 using Revise
+using SparseArrays
 using Graphs
 using ForwardDiff
 using Random
@@ -45,17 +53,20 @@ using KrylovKit
 using Convex
 using SCS
 
+const MAX_THREADS = 1024
+
 function setRandomSeed(seed::Int)
     Random.seed!(seed)
 end
 
-# inside /general/
+# inside /base/
 include(joinpath("base", "qaoa.jl"))
 include(joinpath("base", "gradient.jl"))
 include(joinpath("base", "hamiltonians.jl"))
 include(joinpath("base", "layers.jl"))
 include(joinpath("base", "optimization_settings.jl"))
 include(joinpath("base", "parameters.jl"))
+include(joinpath("base", "gpu.jl"))
 
 # inside /classical
 include(joinpath("classical", "maxcut.jl"))
@@ -77,6 +88,7 @@ include(joinpath("saddles", "saddles_search.jl"))
 # inside /utilities
 include(joinpath("utilities", "utils.jl"))
 include(joinpath("utilities", "state_utilities.jl"))
+
 
 include("harvard_instance.jl")
 end

@@ -9,11 +9,8 @@ function kernelExpX!(psi::AbstractVector{Complex{T}}, bitmask::Int, cos_a::T, si
         val1 = psi[i1]
         val2 = psi[i2]
 
-        # psi[i1] = cos_a * val1 - im * sin_a * val2
-        # psi[i2] = cos_a * val2 - im * sin_a * val1
-
-        psi[i1] = cos_a * val1 + im * sin_a * val2
-        psi[i2] = cos_a * val2 + im * sin_a * val1
+        psi[i1] = cos_a * val1 - im * sin_a * val2
+        psi[i2] = cos_a * val2 - im * sin_a * val1
     end
     return
 end
@@ -23,11 +20,8 @@ function kernelExpXParity!(psi::AbstractVector{Complex{T}}, dim::Int, cβ::T, s�
     val1 = psi[i]
     val2 = psi[dim-i+1]
 
-    # psi[i]       = cβ * val1 - im * sβ * val2
-    # psi[dim-i+1] = cβ * val2 - im * sβ * val1
-
-    psi[i]       = cβ * val1 + im * sβ * val2
-    psi[dim-i+1] = cβ * val2 + im * sβ * val1
+    psi[i]       = cβ * val1 - im * sβ * val2
+    psi[dim-i+1] = cβ * val2 - im * sβ * val1
     
     return
 end
@@ -116,7 +110,7 @@ function Hx_ψ!(qaoa::QAOA{T1, T2, T3}, psi::AbstractVector{Complex{T2}}, result
     num_groups_parity = (dim ÷ 2) ÷ MAX_THREADS
     
     # Added: psi .*= Complex{T2}(-1)
-    psi .*= Complex{T2}(-1)
+    # psi .*= Complex{T2}(-1)
     result .= psi
 
     for qubit in 1:N
@@ -137,7 +131,7 @@ function Hx_ψ!(qaoa::QAOA{T1, T2, T3}, psi::AbstractVector{Complex{T2}}) where 
     num_groups_parity = (dim ÷ 2) ÷ MAX_THREADS
     
     # Added: psi .*= Complex{T2}(-1)
-    psi .*= Complex{T2}(-1)
+    # psi .*= Complex{T2}(-1)
     result = copy(psi)
 
     for qubit in 1:N

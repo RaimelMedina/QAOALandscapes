@@ -275,46 +275,20 @@ We then launch the `QAOA` optimization procedure from the point in the 2-dimensi
 """
 function getInitialParameter(qaoa::QAOA{T1, T, T3}; 
     setup=OptSetup(), 
-    spacing = T(0.01), 
-    gradTol = 1e-6,
-    threaded=false
+    num_points=20, 
     ) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
     
-    βIndex  = collect(T, -π/4:spacing:π/4)
-    
-    isWeightedG  = typeof(qaoa.graph) <: SimpleWeightedGraph
-    if  QAOALandscapes.isdRegularGraph(qaoa.graph, 3) && !isWeightedG
-        γIndex  = collect(T, 0.0:(spacing/2):π/4)
-    else
-        spacing *= 2
-        γIndex  = collect(T, -π/2:spacing:π/2)
+    initial_points = rand(T, 2, num_points)
+    energies_points = zeros(T, num_points)
+    params_points  = zeros(T, 2, num_points)
+
+    for i ∈ 1:num_points
+        (params_points[:, i], energies_points[i]) = optimizeParameters(qaoa, Vector(initial_points[:, i]), setup=setup)
     end
     
-    energy  = zeros(T, length(γIndex), length(βIndex))
+    (Einit, index) = findmin(energies_points)
+    Γ = Vector(params_points[:, index])
+    toFundamentalRegion!(qaoa, Γ)
 
-    if threaded
-        Threads.@threads for j in eachindex(βIndex)
-            for i in eachindex(γIndex)
-                energy[i,j] = qaoa([γIndex[i], βIndex[j]])
-            end
-        end
-    else
-        for j in eachindex(βIndex)
-            for i in eachindex(γIndex)
-                energy[i,j] = qaoa([γIndex[i], βIndex[j]])
-            end
-        end
-    end
-    pos = argmin(energy)
-    Γ   = [γIndex[pos[1]], βIndex[pos[1]]] 
-
-    gradNormGridMin = norm(gradCostFunction(qaoa, Γ))
-    if gradNormGridMin > gradTol
-        newParams, newEnergy = optimizeParameters(qaoa, Γ, setup=setup)
-        #toFundamentalRegion!(qaoa, newParams)
-        println("Convergence reached. Energy = $(newEnergy)")
-        return newParams, newEnergy
-    else
-        return Γ, energy[pos]
-    end
+    return Γ, Einit
 end

@@ -24,13 +24,13 @@ function applyExpX!(psi::Vector{Complex{T}}, k::Int, cos_a::T, sin_a::T) where T
             val1 = psi[i1]
             val2 = psi[i2]
 
-            # psi[i1] = cos_a * val1 - im * sin_a * val2
-            # psi[i2] = cos_a * val2 - im * sin_a * val1
+            psi[i1] = cos_a * val1 - im * sin_a * val2
+            psi[i2] = cos_a * val2 - im * sin_a * val1
 
             #TODO 
             # changed -im → +im
-            psi[i1] = cos_a * val1 + im * sin_a * val2
-            psi[i2] = cos_a * val2 + im * sin_a * val1
+            # psi[i1] = cos_a * val1 + im * sin_a * val2
+            # psi[i2] = cos_a * val2 + im * sin_a * val1
         end
     end
 
@@ -50,12 +50,12 @@ function applyExpHB!(psi::Vector{Complex{T}}, β::T; parity_symmetry=false) wher
     if parity_symmetry
         #psi .= (cos(β) .* psi) .- (im * sin(β)) .* reverse(psi)
         for i ∈ 1:N÷2
-            # psi[i], psi[N-i+1] = cβ * psi[i] - im * sβ * psi[N-i+1],
-            #                      cβ * psi[N-i+1] - im * sβ * psi[i]
+            psi[i], psi[N-i+1] = cβ * psi[i] - im * sβ * psi[N-i+1],
+                                 cβ * psi[N-i+1] - im * sβ * psi[i]
 
             #TODO
-            psi[i], psi[N-i+1] = cβ * psi[i] + im * sβ * psi[N-i+1],
-                                 cβ * psi[N-i+1] + im * sβ * psi[i]
+            # psi[i], psi[N-i+1] = cβ * psi[i] + im * sβ * psi[N-i+1],
+            #                    cβ * psi[N-i+1] + im * sβ * psi[i]
         end
     end
     return nothing

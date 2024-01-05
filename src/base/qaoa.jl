@@ -110,7 +110,7 @@ end
 function energyVariance(q::QAOA{T1, T2, T3}, Γ::Vector{T2}) where {T1 <: AbstractGraph, T2 <: Real, T3 <: AbstractBackend}
     h_mean_squared = q(Γ)^2
     ψ = getQAOAState(q, Γ)
-    h_squared_mean = dot(ψ, (q.hamiltonian .^2) .* ψ) |> real
+    h_squared_mean = dot(ψ, (q.HC .^2) .* ψ) |> real
     return h_squared_mean - h_mean_squared
 end
 

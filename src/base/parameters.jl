@@ -8,7 +8,7 @@ Base.size(p::Parameter) = size(p.data)
 Base.length(p::Parameter) = length(p.data)
 Base.setindex!(p::Parameter{T}, v::T, i::Int) where T<:Real = (p.data[i]=v)
 
-function setvalue!(param::Parameter{T}, qaoa::QAOA) where T<:Real
+function setvalue!(param::Parameter{T}, qaoa::QAOA{G, T, B}) where {G<:AbstractGraph, T<:Real, B<:AbstractBackend}
     param.value = qaoa(param)
 end
 function setvalue!(param::Parameter{T}, val::T) where T<:Real
@@ -17,7 +17,7 @@ end
 
 Parameter(vec::Vector{T}) where T<:Real = Parameter(T(0), vec)
 
-(qaoa::QAOA)(param::Parameter{T}) where T<:Real = qaoa(param.data)
+(qaoa::QAOA{G, T, B})(param::Parameter{T}) where {G<:AbstractGraph, T<:Real, B<:AbstractBackend} = qaoa(param.data)
 
 
 @doc raw"""

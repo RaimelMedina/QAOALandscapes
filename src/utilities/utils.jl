@@ -199,7 +199,7 @@ function getEquivalentClasses(vec::Vector{T}; rounding=false, sigdigits = 5) whe
         end
     end
     data = collect(values(dictUniqueElements))[sortperm(collect(keys(dictUniqueElements)))]
-    return data 
+    return dictUniqueElements, data 
 end
 
 list(edge::T) where T<:AbstractEdge = Integer[edge.src, edge.dst] 

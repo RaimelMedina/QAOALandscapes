@@ -24,8 +24,8 @@ function toFourierParams(Γ::Vector{T}) where T<:Real
     coeffmat = fourierJacobian(T, p)
     
     Γu          = zeros(T, 2p)
-    Γu[1:2:2p] .= ((2/p)*(sin.(coeffmat ./ p))) * Γ[1:2:2p] |> T
-    Γu[2:2:2p] .= ((2/p)*(cos.(coeffmat ./ p))) * Γ[2:2:2p] |> T
+    Γu[1:2:2p] .= ((2/p)*(sin.(coeffmat ./ p))) * Γ[1:2:2p] .|> T
+    Γu[2:2:2p] .= ((2/p)*(cos.(coeffmat ./ p))) * Γ[2:2:2p] .|> T
     
     return Γu
 end
@@ -45,8 +45,8 @@ function gradCostFunctionFourier(qaoa::QAOA{T1, T}, Γu::Vector{T}) where {T1<:A
     coeffmat = fourierJacobian(T, p)
     
     gradΓu          = zeros(T, 2p)
-    gradΓu[1:2:2p] .= (sin.(coeffmat ./ p)) * gradΓ[1:2:2p] |>
-    gradΓu[2:2:2p] .= (cos.(coeffmat ./ p)) * gradΓ[2:2:2p] |>
+    gradΓu[1:2:2p] .= (sin.(coeffmat ./ p)) * gradΓ[1:2:2p] .|> T
+    gradΓu[2:2:2p] .= (cos.(coeffmat ./ p)) * gradΓ[2:2:2p] .|> T
     return gradΓu
 end
 

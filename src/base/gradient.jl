@@ -336,7 +336,7 @@ Calculate the Hessian index of a stationary (it checks the gradient norm) point 
 The function first calculates the gradient of the cost function for the given `qaoa` and `Γ`. If `checks=true`, it asserts that the norm of this gradient is less than `tol`. It then calculates the Hessian matrix and its eigenvalues, and returns the count of eigenvalues less than zero.
 
 """
-function getHessianIndex(qaoa::QAOA{T1, T}, Γ::Vector{T}; checks=true, tol=1e-6) where {T1<:AbstractGraph, T<:Real}
+function getHessianIndex(qaoa::QAOA{T1, T, T3}, Γ::Vector{T}; checks=true, tol=T(1e-6)) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
     checks && norm(gradCostFunction(qaoa, Γ)) < tol : nothing : @warn "Gradient norm is above the tolerance threshold. Check convergence"
     
     hessian_eigvals = hessianCostFunction(qaoa, Γ) |> eigvals

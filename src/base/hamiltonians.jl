@@ -151,7 +151,7 @@ function Hx_ψ!(qaoa::QAOA{T1, T2}, psi::Vector{Complex{T2}}) where {T1<:Abstrac
     
     #FIXME
     # multiplied by -1 the whole state
-    psi .*= Complex{T2}(-1)
+    # psi .*= Complex{T2}(-1)
     result = copy(psi)
 
     
@@ -182,7 +182,7 @@ function Hx_ψ!(qaoa::QAOA{T1, T2}, psi::Vector{Complex{T2}}, result::Vector{Com
 
     #FIXME
     # multiplied by -1 the whole state
-    psi .*= Complex{T2}(-1)
+    # psi .*= Complex{T2}(-1)
     result .= psi
 
     for qubit in 1:num_qubits

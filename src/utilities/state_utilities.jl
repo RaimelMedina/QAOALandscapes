@@ -109,9 +109,9 @@ end
 
 function gsFidelity(qaoa::QAOA{T1, T, T3}, Γ::Vector{T}, gsIndex::Vector{Int}) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
     if T3<:CPUBackend
-        return computationalBasisWeights(getQAOAState(qaoa, Γ), gsIndex)
+        return computationalBasisWeights(getQAOAState(qaoa, Γ), gsIndex) |> sum
     else
-        return computationalBasisWeights(getQAOAState(qaoa, Γ), gsIndex |> MtlArray)
+        return computationalBasisWeights(getQAOAState(qaoa, Γ), gsIndex |> MtlArray) |> sum
     end
 end
 

@@ -6,9 +6,9 @@ Constructors for the `QAOA` object.
 struct QAOA{T1 <: AbstractGraph, T2 <: Real, T3<:AbstractBackend}
     N::Int
     graph::T1
-    HB::AbstractVector{Complex{T2}}
-    HC::AbstractVector{Complex{T2}}
-    initial_state::AbstractVector{Complex{T2}}
+    HB::Vector{Complex{T2}}
+    HC::Vector{Complex{T2}}
+    initial_state::Vector{Complex{T2}}
     parity_symmetry::Bool
 end
 
@@ -83,6 +83,14 @@ function getQAOAState(q::QAOA{T1, T2, T3}, Γ::Vector{T2}) where {T1 <: Abstract
     return ψ
 end
 
+function getQAOAState(q::QAOA{T1, T2, T3}, Γ) where {T1 <: AbstractGraph, T2 <: Real, T3<:AbstractBackend}
+    ψ::AbstractVector{Complex{eltype(Γ)}} = copy(q.initial_state)
+    for i in eachindex(Γ)
+        applyQAOALayer!(q, Γ[i], i, ψ)
+    end
+    return ψ
+end
+
 function getQAOAState(q::QAOA{T1, T2, T3}, Γ::Vector{T2}, ψ0::AbstractVector{Complex{T2}}) where {T1 <: AbstractGraph, T2 <: Real, T3<:AbstractBackend}
     ψ = copy(ψ0)
     for i in eachindex(Γ)
@@ -105,6 +113,24 @@ function (q::QAOA{T1, T2, T3})(Γ::Vector{T2}) where {T1 <: AbstractGraph, T2 <:
     ψ::AbstractVector{Complex{T2}} = getQAOAState(q, Γ)
     res::T2 = real(dot(ψ, q.HC .* ψ)) 
     return res
+end
+
+function (q::QAOA{T1, T2, T3})(Γ::Vector{T}) where {T1 <: AbstractGraph, T2 <: Real, T3 <: AbstractBackend, T}
+    ψ::AbstractVector{Complex{T2}} = getQAOAState(q, Γ)
+    res = real(dot(ψ, q.HC .* ψ)) 
+    return res
+end
+
+function (q::QAOA{T1, T2, T3})(Γ::Vector{T2}, Etarget::T2) where {T1 <: AbstractGraph, T2 <: Real, T3 <: AbstractBackend}
+    ψ::AbstractVector{Complex{T2}} = getQAOAState(q, Γ)
+    res::T2 = real(dot(ψ, ((q.HC .- Etarget) .^2) .* ψ)) 
+    return res
+end
+
+function (q::QAOA)(Γ, Etarget)
+    ψ::AbstractVector{Complex{eltype(Γ)}} = getQAOAState(q, Γ) 
+    res = dot(ψ, ((q.HC .- Etarget) .^2) .* ψ)
+    return res |> real
 end
 
 function energyVariance(q::QAOA{T1, T2, T3}, Γ::Vector{T2}) where {T1 <: AbstractGraph, T2 <: Real, T3 <: AbstractBackend}

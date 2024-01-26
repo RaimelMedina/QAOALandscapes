@@ -36,6 +36,7 @@ using Revise
 using SparseArrays
 using Graphs
 using ForwardDiff
+using FiniteDiff
 using Random
 using ProgressMeter
 using SimpleWeightedGraphs
@@ -77,6 +78,7 @@ include(joinpath("experimental", "experimental.jl"))
 
 # inside /initializations
 include(joinpath("initializations", "fourier.jl"))
+include(joinpath("initializations", "excited.jl"))
 include(joinpath("initializations", "interp.jl"))
 include(joinpath("initializations", "greedy_ts.jl"))
 include(joinpath("initializations", "transition_states.jl"))

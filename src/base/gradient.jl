@@ -177,7 +177,7 @@ end
 Compute the geometricTensor of the QAOA cost function using adjoint (a reverse-mode) differentiation. We implement the algorithm 
 proposed in [*this reference*](https://arxiv.org/pdf/2011.02991.pdf)
 """
-function geometricTensor(qaoa::QAOA{T1, T, T3}, params::Vector{T}, ψ0::Vector{Complex{T}}) where {T1 <: AbstractGraph, T<: Real, T3<:Real}
+function geometricTensor(qaoa::QAOA{T1, T, T3}, params::Vector{T}, ψ0::Vector{Complex{T}}) where {T1 <: AbstractGraph, T<: Real, T3<:AbstractBackend}
     T_vec = zeros(Complex{T}, length(params))
     L_mat = zeros(Complex{T}, length(params), length(params))
     G_mat = zeros(Complex{T}, length(params), length(params))
@@ -336,9 +336,10 @@ Calculate the Hessian index of a stationary (it checks the gradient norm) point 
 The function first calculates the gradient of the cost function for the given `qaoa` and `Γ`. If `checks=true`, it asserts that the norm of this gradient is less than `tol`. It then calculates the Hessian matrix and its eigenvalues, and returns the count of eigenvalues less than zero.
 
 """
-function getHessianIndex(qaoa::QAOA{T1, T, T3}, Γ::Vector{T}; checks=true, tol=T(1e-6)) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
-    checks && norm(gradCostFunction(qaoa, Γ)) < tol : nothing : @warn "Gradient norm is above the tolerance threshold. Check convergence"
-    
+function getHessianIndex(qaoa::QAOA{T1, T, T3}, Γ::Vector{T}; tol=T(1e-6)) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
+    gn = norm(gradCostFunction(qaoa, Γ))
+    if gn ≥ tol; @show "Gradient norm is gn = $(gn) above the tolerance threshold. Check convergence" end
+
     hessian_eigvals = hessianCostFunction(qaoa, Γ) |> eigvals
     return count(x->x<0, filter(x -> abs(x) > tol, hessian_eigvals))
 end

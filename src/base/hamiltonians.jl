@@ -206,7 +206,7 @@ end
 
 
 function Hzz_ψ!(qaoa::QAOA{T1, T2}, psi::Vector{Complex{T2}}) where {T1<:AbstractGraph, T2<:Real}
-    Threads.@threads for i in eachindex(qaoa.HC, psi)
+    for i in eachindex(psi)
         psi[i] *= qaoa.HC[i]
     end
     return nothing

@@ -234,7 +234,7 @@ function optimizeParametersSlice(qaoa::QAOA{T1,T, T3},
     u   = getNegativeHessianEigvec(qaoa, Γmin, ig, tsType=tsType)["eigvec_approx"] |> Array
 
     energ(x) = qaoa(ΓTs + u*x[1])
-    distn(x) = -gsFidelity(qaoa, ΓTs + u*x[1], gsIndex)[1]
+    # distn(x) = -gsFidelity(qaoa, ΓTs + u*x[1], gsIndex)
     # Set limits of search #
     lower = T.([(-1)])
     upper = T.([1])
@@ -249,12 +249,12 @@ function optimizeParametersSlice(qaoa::QAOA{T1,T, T3},
     energ_res_m = optimize(energ, lower, upper, x0_m, Fminbox(inner_optimizer))
     energ_res_p = optimize(energ, lower, upper, x0_p, Fminbox(inner_optimizer))
 
-    distn_res_m = optimize(distn, lower, upper, x0_m, Fminbox(inner_optimizer))
-    distn_res_p = optimize(distn, lower, upper, x0_p, Fminbox(inner_optimizer))
+    # distn_res_m = optimize(distn, lower, upper, x0_m, Fminbox(inner_optimizer))
+    # distn_res_p = optimize(distn, lower, upper, x0_p, Fminbox(inner_optimizer))
     
     result = Dict(
-        "energy" => (val = [Optim.minimum(energ_res_m), Optim.minimum(energ_res_p)], x_opt = vcat([Optim.minimizer(energ_res_m), Optim.minimizer(energ_res_p)]...)),
-        "fidelity" => (val = [-Optim.minimum(distn_res_m), -Optim.minimum(distn_res_p)], x_opt = vcat([Optim.minimizer(distn_res_m), Optim.minimizer(distn_res_p)]...))
+        "energy" => (val = [Optim.minimum(energ_res_m), Optim.minimum(energ_res_p)], x_opt = vcat([Optim.minimizer(energ_res_m), Optim.minimizer(energ_res_p)]...))
+        # "fidelity" => (val = [-Optim.minimum(distn_res_m), -Optim.minimum(distn_res_p)], x_opt = vcat([Optim.minimizer(distn_res_m), Optim.minimizer(distn_res_p)]...))
     )
     
     return result

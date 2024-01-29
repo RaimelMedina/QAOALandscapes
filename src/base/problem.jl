@@ -86,7 +86,7 @@ function hamiltonian(cp::ClassicalProblem{T}, sym_sector = true) where T
     return ham
 end
 
-function Hc_ψ!(ham::MtlVector{S}, ψ::MtlVector{T}) where {S, T}
+function Hc_ψ!(ham::AbstractVector{S}, ψ::AbstractVector{T}) where {S, T}
     dim = length(ψ)
     num_groups = dim ÷ MAX_THREADS
 
@@ -119,7 +119,7 @@ end
 #     end
 # end
 
-function kernelHCψ!(hc::MtlVector{T}, psi::MtlVector{R}) where {T, R}
+function kernelHCψ!(hc::AbstractVector{T}, psi::AbstractVector{R}) where {T, R}
     i = thread_position_in_grid_1d()
     psi[i] *= hc[i]
     return

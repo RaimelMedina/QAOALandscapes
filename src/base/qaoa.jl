@@ -39,7 +39,7 @@ function QAOA(cp::ClassicalProblem{R}, ham::Vector{Complex{R}}, mixer::AbstractM
     return QAOA{K, T, M}(cp.n, cp, ham, mixer, ψ0)
 end
 
-function QAOA(cp::ClassicalProblem{R}, ham::MtlVector{Complex{R}}, mixer::AbstractMixer) where R<:Real
+function QAOA(cp::ClassicalProblem{R}, ham::AbstractVector{Complex{R}}, mixer::AbstractMixer) where R<:Real
     T = typeof(ham)
     M = typeof(mixer)
     K = typeof(cp)
@@ -125,10 +125,10 @@ end
 #     return res |> real
 # end
 
-function energyVariance(q::QAOA{T1, T2, T3}, Γ::Vector{T2}) where {T1 <: AbstractGraph, T2 <: Real, T3 <: AbstractBackend}
-    h_mean_squared = q(Γ)^2
-    ψ = getQAOAState(q, Γ)
-    h_squared_mean = dot(ψ, (q.HC .^2) .* ψ) |> real
-    return h_squared_mean - h_mean_squared
-end
+# function energyVariance(q::QAOA{T1, T2, T3}, Γ::Vector{T2}) where {T1 <: AbstractGraph, T2 <: Real, T3 <: AbstractBackend}
+#     h_mean_squared = q(Γ)^2
+#     ψ = getQAOAState(q, Γ)
+#     h_squared_mean = dot(ψ, (q.HC .^2) .* ψ) |> real
+#     return h_squared_mean - h_mean_squared
+# end
 

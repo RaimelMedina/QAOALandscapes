@@ -36,7 +36,7 @@ function applyExpLayer!(mixer::XMixer, psi::Vector{T}, β::R) where {T, R}
     return nothing
 end
 
-function kernelExpX!(psi::MtlVector{T}, bitmask::Int, cos_a::K, sin_a::K) where {T, K}
+function kernelExpX!(psi::AbstractVector{T}, bitmask::Int, cos_a::K, sin_a::K) where {T, K}
     index = thread_position_in_grid_1d() - 1
     if index & bitmask == 0
         i1 = index + 1
@@ -52,7 +52,7 @@ function kernelExpX!(psi::MtlVector{T}, bitmask::Int, cos_a::K, sin_a::K) where 
     return
 end
 
-function kernelExpXParity!(psi::MtlVector{T}, dim::Int, cβ::K, sβ::K) where {T, K}
+function kernelExpXParity!(psi::AbstractVector{T}, dim::Int, cβ::K, sβ::K) where {T, K}
     i = thread_position_in_grid_1d()
     val1 = psi[i]
     val2 = psi[dim-i+1]
@@ -63,7 +63,7 @@ function kernelExpXParity!(psi::MtlVector{T}, dim::Int, cβ::K, sβ::K) where {T
     return
 end
 
-function applyExpX!(psi::MtlVector{T}, k::Int, cos_a::K, sin_a::K) where {T,K}
+function applyExpX!(psi::AbstractVector{T}, k::Int, cos_a::K, sin_a::K) where {T,K}
     dim = length(psi)
     bitmask = 1 << (k-1)
     num_groups = dim ÷ MAX_THREADS
@@ -71,7 +71,7 @@ function applyExpX!(psi::MtlVector{T}, k::Int, cos_a::K, sin_a::K) where {T,K}
     return nothing
 end
 
-function applyExpLayer!(mixer::XMixer, psi::MtlVector{T}, β::R) where {T, R}
+function applyExpLayer!(mixer::XMixer, psi::AbstractVector{T}, β::R) where {T, R}
     cβ = cos(β)
     sβ = sin(β)
     
@@ -99,13 +99,13 @@ function applyExpLayer!(hc::Vector{T}, ψ::Vector{K}, γ::R) where {T, K, R}
     return nothing
 end
 
-function kernelExpHC!(hc::MtlVector{T}, ψ::MtlVector{K}, γ::R) where {T, K, R}
+function kernelExpHC!(hc::AbstractVector{T}, ψ::AbstractVector{K}, γ::R) where {T, K, R}
     i = thread_position_in_grid_1d()
     ψ[i] *= exp(-im * γ * hc[i])
     return
 end
 
-function applyExpLayer!(hc::MtlVector{T}, ψ::MtlVector{K}, γ::R) where {T, K, R}
+function applyExpLayer!(hc::AbstractVector{T}, ψ::AbstractVector{K}, γ::R) where {T, K, R}
     dim = length(ψ)
     num_groups = dim ÷ MAX_THREADS
     @metal threads=MAX_THREADS groups=num_groups kernelExpHC!(hc, ψ, γ)

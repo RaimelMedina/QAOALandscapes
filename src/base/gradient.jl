@@ -22,7 +22,7 @@ function gradient!(G::Vector{T2}, qaoa::QAOA{T1, T2, T3}, gradTape::GradientTape
     gradTape.ξ .= gradTape.λ
     
     # |λ⟩ := H |λ⟩
-    Hzz_ψ!(qaoa, gradTape.λ)
+    Hc_ψ!(qaoa, gradTape.λ)
     
     # now we allocate |μ⟩
     # μ = similar(λ)

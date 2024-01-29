@@ -28,6 +28,8 @@ export harvardGraph
 abstract type AbstractBackend end
 abstract type CPUBackend <: AbstractBackend end
 abstract type METALBackend <: AbstractBackend end
+abstract type AbstractProblem end
+abstract type AbstractMixer end
 
 export AbstractBackend, CPUBackend, METALBackend
 
@@ -61,13 +63,17 @@ function setRandomSeed(seed::Int)
 end
 
 # inside /base/
+include(joinpath("base", "problem.jl"))
+include(joinpath("base", "x_mixer.jl"))
 include(joinpath("base", "qaoa.jl"))
 include(joinpath("base", "gradient.jl"))
-include(joinpath("base", "hamiltonians.jl"))
+#include(joinpath("base", "hamiltonians.jl"))
 include(joinpath("base", "layers.jl"))
 include(joinpath("base", "optimization_settings.jl"))
 include(joinpath("base", "parameters.jl"))
-include(joinpath("base", "gpu.jl"))
+#include(joinpath("base", "gpu.jl"))
+
+
 
 # inside /classical
 include(joinpath("classical", "maxcut.jl"))

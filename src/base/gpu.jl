@@ -1,30 +1,5 @@
 #### First come the definitions needed to construct the QAOA state ####
-function kernelExpX!(psi::AbstractVector{Complex{T}}, bitmask::Int, cos_a::T, sin_a::T) where T<:Real
-    index = thread_position_in_grid_1d() - 1
-    if index & bitmask == 0
-        i1 = index + 1
-        i2 = index + 1 + bitmask
 
-        # Create local copies to avoid race conditions
-        val1 = psi[i1]
-        val2 = psi[i2]
-
-        psi[i1] = cos_a * val1 - im * sin_a * val2
-        psi[i2] = cos_a * val2 - im * sin_a * val1
-    end
-    return
-end
-
-function kernelExpXParity!(psi::AbstractVector{Complex{T}}, dim::Int, cβ::T, sβ::T) where T<:Real
-    i = thread_position_in_grid_1d()
-    val1 = psi[i]
-    val2 = psi[dim-i+1]
-
-    psi[i]       = cβ * val1 - im * sβ * val2
-    psi[dim-i+1] = cβ * val2 - im * sβ * val1
-    
-    return
-end
 
 
 function applyExpX!(::Type{METALBackend}, psi::AbstractVector{Complex{T}}, k::Int, cos_a::T, sin_a::T) where T<:Real

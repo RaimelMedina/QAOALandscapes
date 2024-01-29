@@ -3,62 +3,60 @@
 
 Constructors for the `QAOA` object.
 """
-struct QAOA{T1 <: AbstractGraph, T2 <: Real, T3<:AbstractBackend}
+struct QAOA{K<:AbstractProblem, T<:AbstractVector, M <: AbstractMixer}
     N::Int
-    graph::T1
-    HB::Vector{Complex{T2}}
-    HC::Vector{Complex{T2}}
-    initial_state::Vector{Complex{T2}}
-    parity_symmetry::Bool
+    problem::K
+    HC::T
+    mixer::M
+    initial_state::T
 end
 
-function QAOA(T2::Type{<:Real}, g::T1; applySymmetries=true) where T1 <: AbstractGraph
-    N = nv(g)
-    if applySymmetries==false
-        h = 2*HzzDiag(Complex{T2}, g)
-        QAOA{T1, T2, CPUBackend}(N, g, HxDiag(Complex{T2}, g), h, plus_state(CPUBackend, T2, N), false)
+function QAOA(cp::ClassicalProblem{R}) where R<:Real
+    mixer = XMixer(cp.n)
+    ham = hamiltonian(cp)
+
+    T = typeof(ham)
+    M = typeof(mixer)
+    K = typeof(cp)
+    
+    if z2SymmetricQ(cp)
+        ψ0 = fill(Complex{R}(1/sqrt(2^(cp.n-1))), 2^(cp.n-1))
     else
-        h = HzzDiagSymmetric(Complex{T2}, g)
-        QAOA{T1, T2, CPUBackend}(N-1, g, HxDiagSymmetric(Complex{T2}, g), h, plus_state(CPUBackend, T2, N-1), true) 
+        ψ0 = fill(Complex{R}(1/sqrt(2^(cp.n))), 2^(cp.n))
     end
+    return QAOA{K, T, M}(cp.n, cp, ham, mixer, ψ0)
+end
+function QAOA(cp::ClassicalProblem{R}, ham::Vector{Complex{R}}, mixer::AbstractMixer) where R<:Real
+    T = typeof(ham)
+    M = typeof(mixer)
+    K = typeof(cp)
+    
+    if z2SymmetricQ(cp)
+        ψ0 = fill(Complex{R}(1/sqrt(2^(cp.n-1))), 2^(cp.n-1))
+    else
+        ψ0 = fill(Complex{R}(1/sqrt(2^(cp.n))), 2^(cp.n))
+    end
+    return QAOA{K, T, M}(cp.n, cp, ham, mixer, ψ0)
 end
 
-function QAOA(T3::Type{METALBackend}, ::Type{<:Float32}, g::T1; applySymmetries=true) where {T1 <: AbstractGraph}
-    N = nv(g)
-    T2 = Float32
-    if applySymmetries==false
-        h = MtlArray(2*HzzDiag(Complex{T2}, g))
-        QAOA{T1, T2, METALBackend}(N, g, MtlArray(HxDiag(Complex{T2}, g)), h, plus_state(T3, T2, N), false)
+function QAOA(cp::ClassicalProblem{R}, ham::MtlVector{Complex{R}}, mixer::AbstractMixer) where R<:Real
+    T = typeof(ham)
+    M = typeof(mixer)
+    K = typeof(cp)
+    
+    if z2SymmetricQ(cp)
+        ψ0 = Metal.fill(Complex{R}(1/sqrt(2^(cp.n-1))), 2^(cp.n-1))
     else
-        h = MtlArray(HzzDiagSymmetric(Complex{T2}, g))
-        QAOA{T1, T2, METALBackend}(N-1, g, MtlArray(HxDiagSymmetric(Complex{T2}, g)), h, plus_state(T3, T2, N-1), true) 
+        ψ0 = Metal.fill(Complex{R}(1/sqrt(2^(cp.n))), 2^(cp.n))
     end
+    return QAOA{K, T, M}(cp.n, cp, ham, mixer, ψ0)
 end
 
-function Base.show(io::IO, qaoa::QAOA{T1, T2, T3}) where {T1 <: AbstractGraph, T2<:Real, T3<:METALBackend}
-    str = "QAOA object with:
-    running on the Metal backend, 
-    number of qubits = $(qaoa.N)."
-    if qaoa.parity_symmetry
-        str2 = "
-    Z₂ parity symmetry"
-        print(io, str * str2)
-    else
-        print(io, str)
-    end
-end
-
-function Base.show(io::IO, qaoa::QAOA{T1, T2, T3}) where {T1 <: AbstractGraph, T2<:Real, T3<:CPUBackend}
-    str = "QAOA object with:
-    running on the CPU, 
-    number of qubits = $(qaoa.N)."
-    if qaoa.parity_symmetry
-        str2 = "
-    Z₂ parity symmetry"
-        print(io, str * str2)
-    else
-        print(io, str)
-    end
+function Base.show(io::IO, qaoa::QAOA{P, H, M}) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer}
+    storage_str = (H <: MtlVector) ? "Metal-GPU" : "CPU"
+    str0 = "QAOA object on $(qaoa.N) qubits with mixer type `$(M)`. "
+    str1 = "Running on the: -" * storage_str * "- backend."
+    print(io, str0 * str1)
 end
 
 @doc raw"""
@@ -75,23 +73,16 @@ with
 ```
 and ``H_B, H_C`` corresponding to the mixing and cost Hamiltonian correspondingly.
 """
-function getQAOAState(q::QAOA{T1, T2, T3}, Γ::Vector{T2}) where {T1 <: AbstractGraph, T2 <: Real, T3<:AbstractBackend}
-    ψ::AbstractVector{Complex{T2}} = copy(q.initial_state)
+
+function getQAOAState(q::QAOA{P, H, M}, Γ::Vector{R}) where {P, H, M, R}
+    ψ = copy(q.initial_state)
     for i in eachindex(Γ)
         applyQAOALayer!(q, Γ[i], i, ψ)
     end
     return ψ
 end
 
-function getQAOAState(q::QAOA{T1, T2, T3}, Γ) where {T1 <: AbstractGraph, T2 <: Real, T3<:AbstractBackend}
-    ψ::AbstractVector{Complex{eltype(Γ)}} = copy(q.initial_state)
-    for i in eachindex(Γ)
-        applyQAOALayer!(q, Γ[i], i, ψ)
-    end
-    return ψ
-end
-
-function getQAOAState(q::QAOA{T1, T2, T3}, Γ::Vector{T2}, ψ0::AbstractVector{Complex{T2}}) where {T1 <: AbstractGraph, T2 <: Real, T3<:AbstractBackend}
+function getQAOAState(q::QAOA{P, H, M}, Γ::Vector{T}, ψ0::H) where {P, H, M, T}
     ψ = copy(ψ0)
     for i in eachindex(Γ)
         applyQAOALayer!(q, Γ[i], i, ψ)
@@ -109,29 +100,30 @@ More specifically, it returns the following real number:
     E(\Gamma^p) = \langle \Gamma^p |H_C|\Gamma^p \rangle
 ```
 """
-function (q::QAOA{T1, T2, T3})(Γ::Vector{T2}) where {T1 <: AbstractGraph, T2 <: Real, T3 <: AbstractBackend}
-    ψ::AbstractVector{Complex{T2}} = getQAOAState(q, Γ)
-    res::T2 = real(dot(ψ, q.HC .* ψ)) 
-    return res
-end
 
-function (q::QAOA{T1, T2, T3})(Γ::Vector{T}) where {T1 <: AbstractGraph, T2 <: Real, T3 <: AbstractBackend, T}
-    ψ::AbstractVector{Complex{T2}} = getQAOAState(q, Γ)
+function (q::QAOA{P, H, M})(Γ::Vector{R}) where {P, H, M, R}
+    ψ = getQAOAState(q, Γ)
     res = real(dot(ψ, q.HC .* ψ)) 
     return res
 end
 
-function (q::QAOA{T1, T2, T3})(Γ::Vector{T2}, Etarget::T2) where {T1 <: AbstractGraph, T2 <: Real, T3 <: AbstractBackend}
-    ψ::AbstractVector{Complex{T2}} = getQAOAState(q, Γ)
-    res::T2 = real(dot(ψ, ((q.HC .- Etarget) .^2) .* ψ)) 
-    return res
-end
+# function (q::QAOA{T1, T2, T3})(Γ::Vector{T}) where {T1 <: AbstractGraph, T2 <: Real, T3 <: AbstractBackend, T}
+#     ψ::AbstractVector{Complex{T2}} = getQAOAState(q, Γ)
+#     res = real(dot(ψ, q.HC .* ψ)) 
+#     return res
+# end
 
-function (q::QAOA)(Γ, Etarget)
-    ψ::AbstractVector{Complex{eltype(Γ)}} = getQAOAState(q, Γ) 
-    res = dot(ψ, ((q.HC .- Etarget) .^2) .* ψ)
-    return res |> real
-end
+# function (q::QAOA{T1, T2, T3})(Γ::Vector{T2}, Etarget::T2) where {T1 <: AbstractGraph, T2 <: Real, T3 <: AbstractBackend}
+#     ψ::AbstractVector{Complex{T2}} = getQAOAState(q, Γ)
+#     res::T2 = real(dot(ψ, ((q.HC .- Etarget) .^2) .* ψ)) 
+#     return res
+# end
+
+# function (q::QAOA)(Γ, Etarget)
+#     ψ::AbstractVector{Complex{eltype(Γ)}} = getQAOAState(q, Γ) 
+#     res = dot(ψ, ((q.HC .- Etarget) .^2) .* ψ)
+#     return res |> real
+# end
 
 function energyVariance(q::QAOA{T1, T2, T3}, Γ::Vector{T2}) where {T1 <: AbstractGraph, T2 <: Real, T3 <: AbstractBackend}
     h_mean_squared = q(Γ)^2

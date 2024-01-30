@@ -6,11 +6,11 @@ the local minimum `Γmin`. The transition state is completely specified by the i
 type of transition states (`"symmetric"` or `"non_symmetric"`). The cost of obtaining this approximate eigenvalue is basically
 the cost of computing two matrix elements of a Hessian.
 """
-function getNegativeHessianEigval(qaoa::QAOA{T1, T, T3}, 
+function getNegativeHessianEigval(qaoa::QAOA{P,H,M}, 
     Γmin::Vector{T}, 
     ig::Int; 
     tsType="symmetric"
-    ) where {T1 <: AbstractGraph, T<:Real, T3<:AbstractBackend}
+    ) where {P,H,M,T<:Real}
 
     ΓTs = transitionState(Γmin, ig, tsType=tsType)
     p    = length(Γmin) ÷ 2
@@ -116,12 +116,12 @@ the approximate and true eigenvector
 # Returns
 * `result::Dict` Dictionary with the following keys: `eigvec_approx`, `eigval_approx`. If `doChecks=true` the following additional keys are available: `change_basis`, `eigvec_fidelity` and `eigval_error`
 """
-function getNegativeHessianEigvec(qaoa::QAOA{T1, T, T3}, 
+function getNegativeHessianEigvec(qaoa::QAOA{P, H, M}, 
     Γmin::Vector{T}, 
     ig::Int; 
     tsType="symmetric", 
     doChecks=false
-    ) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
+    ) where {P, H, M, T<:Real}
     
     p   = length(Γmin) ÷ 2
     dim = 2(p+1)

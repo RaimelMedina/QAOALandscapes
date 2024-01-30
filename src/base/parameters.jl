@@ -8,7 +8,7 @@ Base.size(p::Parameter) = size(p.data)
 Base.length(p::Parameter) = length(p.data)
 Base.setindex!(p::Parameter{T}, v::T, i::Int) where T<:Real = (p.data[i]=v)
 
-function setvalue!(param::Parameter{T}, qaoa::QAOA{G, T, B}) where {G<:AbstractGraph, T<:Real, B<:AbstractBackend}
+function setvalue!(param::Parameter{T}, qaoa::QAOA{P, H, M}) where {P, H, M, T<:Real}
     param.value = qaoa(param)
 end
 function setvalue!(param::Parameter{T}, val::T) where T<:Real
@@ -17,7 +17,7 @@ end
 
 Parameter(vec::Vector{T}) where T<:Real = Parameter(T(0), vec)
 
-(qaoa::QAOA{G, T, B})(param::Parameter{T}) where {G<:AbstractGraph, T<:Real, B<:AbstractBackend} = qaoa(param.data)
+(qaoa::QAOA{P, H, M})(param::Parameter{T}) where {P, H, M, T<:Real} = qaoa(param.data)
 
 
 @doc raw"""
@@ -30,9 +30,9 @@ can be restricted even further to the ``[-\pi/4, \pi/4]`` interval (see [`here`]
 Finally, when dealing with regular graphs with odd degree `\gamma` paramaters can be brought to the ``[-\pi/4, \pi/4]`` interval.
 This function modifies inplace the initial input vector ``Γ``. 
 """
-function toFundamentalRegion!(qaoa::QAOA{T1, T, T3}, 
+function toFundamentalRegion!(qaoa::QAOA{P, H, M}, 
     Γ::Vector{T}
-    ) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
+    ) where {P, H, M, T}
     
     p = length(Γ) ÷ 2
     β = view(Γ, 2:2:2p)
@@ -46,9 +46,9 @@ function toFundamentalRegion!(qaoa::QAOA{T1, T, T3},
         end
     end
 
-    graph_degree = degree(qaoa.graph)
-    isWeightedG  = typeof(qaoa.graph) <: SimpleWeightedGraph
-    if reduce(*, isodd.(graph_degree)) && !isWeightedG 
+    problem_degree = qaoa.problem.degree
+    isWeightedG  = qaoa.problem.weightedQ
+    if reduce(*, isodd.(problem_degree)) && !isWeightedG 
         # enter here if each vertex has odd degree d. Assuming regular graphs here :|
         # also, this only works for unweighted d-regular random graphs 
         for i=1:p

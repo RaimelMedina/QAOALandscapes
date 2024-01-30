@@ -40,9 +40,9 @@ optimization.
 # Return
 * `result:Tuple`. The first element corresponds to the vector corresponding to which the algorithm converged to, and the second element is correponding energy_history
 """
-function rollDownInterp(qaoa::QAOA{T1, T, T3}, Γmin::Vector{T}; 
+function rollDownInterp(qaoa::QAOA{P, H, M}, Γmin::Vector{T}; 
     setup=OptSetup()
-    ) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
+    ) where {P, H, M, T<:Real}
 
     ΓInterp = interpInitialization(Γmin)
 
@@ -66,11 +66,11 @@ By default the `BFGS` optimizer is used.
 # Return
 * `result:Dict`. Dictionary with keys being `keys \in [1, pmax]` and values being a `Tuple{Float64, Vector{Float64}}` of cost function value and corresponding parameter.
 """
-function interpOptimize(qaoa::QAOA{T1, T, T3}, 
+function interpOptimize(qaoa::QAOA{P, H, M}, 
     Γ0::Vector{T}, 
     pmax::Int; 
     setup=OptSetup()
-    ) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
+    ) where {P, H, M, T<:Real}
 
     listMinima = Dict{T, Tuple{T, Vector{T}}}()
     p = length(Γ0) ÷ 2 

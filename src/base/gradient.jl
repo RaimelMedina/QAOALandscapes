@@ -1,18 +1,19 @@
-mutable struct GradientTape{T <: Real}
-    λ::AbstractVector{Complex{T}}
-    ϕ::AbstractVector{Complex{T}}
-    μ::AbstractVector{Complex{T}}
-    ξ::AbstractVector{Complex{T}}
+mutable struct GradientTape{T <: AbstractVector}
+    λ::T
+    ϕ::T
+    μ::T
+    ξ::T
 
-    function GradientTape(qaoa::QAOA{T1, T2, T3}) where {T1<:AbstractGraph, T2<:Real, T3<:AbstractBackend}
-        return new{T2}(copy(qaoa.initial_state), 
+    function GradientTape(qaoa::QAOA{P, H, M}) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer}
+        return new{H}(copy(qaoa.initial_state), 
             copy(qaoa.initial_state), 
             copy(qaoa.initial_state), 
-            copy(qaoa.initial_state))
+            copy(qaoa.initial_state)
+            )
     end
 end
 
-function gradient!(G::Vector{T2}, qaoa::QAOA{T1, T2, T3}, gradTape::GradientTape{T2}, params::Vector{T2}) where {T1 <:AbstractGraph, T2<: Real, T3<:AbstractBackend}
+function gradient!(G::Vector{T}, qaoa::QAOA{P, H, M}, gradTape::GradientTape{H}, params::Vector{T}) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
     # this will update/populate qaoa.state which we will call |λ⟩ following the paper
     gradTape.λ = getQAOAState(qaoa, params)
     # |ϕ⟩ := |λ⟩
@@ -21,8 +22,8 @@ function gradient!(G::Vector{T2}, qaoa::QAOA{T1, T2, T3}, gradTape::GradientTape
     # needed to not allocate a new array when doing Hx|ψ⟩
     gradTape.ξ .= gradTape.λ
     
-    # |λ⟩ := H |λ⟩
-    Hc_ψ!(qaoa, gradTape.λ)
+    # |λ⟩ := HC |λ⟩
+    Hc_ψ!(qaoa.HC, gradTape.λ)
     
     # now we allocate |μ⟩
     # μ = similar(λ)
@@ -38,7 +39,7 @@ function gradient!(G::Vector{T2}, qaoa::QAOA{T1, T2, T3}, gradTape::GradientTape
         applyQAOALayerDerivative!(qaoa, params[i], i, gradTape.μ, gradTape.ξ)
         
         # ∇Eᵢ = 2 ℜ ⟨ λ | μ ⟩
-        G[i] = T2(2)*real(dot(gradTape.λ, gradTape.μ))
+        G[i] = T(2)*real(dot(gradTape.λ, gradTape.μ))
         if i > 1
             #|λ⟩ ← (Uᵢ)†|λ⟩
             applyQAOALayer!(qaoa, -params[i], i, gradTape.λ)
@@ -52,49 +53,7 @@ end
 Compute the gradient of the QAOA cost function using adjoint (a reverse-mode) differentiation. We implement the algorithm 
 proposed in [*this reference*](https://arxiv.org/abs/2009.02823). https://arxiv.org/pdf/2011.02991.pdf
 """
-# function gradCostFunction_v2(qaoa::QAOA{T1, T2, T3}, params::Vector{T2}) where {T1 <:AbstractGraph, T2<: Real, T3<:AbstractBackend}
-#     # this will update/populate qaoa.state which we will call |λ⟩ following the paper
-#     λ = getQAOAState(qaoa, params) # U(Γ) |+⟩
-    
-#     # |ϕ⟩ := |λ⟩
-#     ϕ = copy(λ)
-
-#     # |λ⟩ := H |λ⟩
-#     Hzz_ψ!(qaoa, λ)
-    
-#     # now we allocate |μ⟩
-#     μ = similar(λ)
-
-#     gradResult = zeros(T2, length(params))
-    
-#     for i in length(params):-1:1
-#         # |ϕ⟩ ← (Uᵢ)†|ϕ⟩    
-#         applyQAOALayer!(qaoa, -params[i], i, ϕ)
-        
-#         # |μ⟩ ← |ϕ⟩
-#         μ .= ϕ
-
-#         # |μ⟩ ← dUᵢ/dθᵢ |μ⟩
-#         applyQAOALayerDerivative!(qaoa, params[i], i, μ)
-#         # applyQAOALayer!(qaoa, params[i], i, μ)
-#         # if isodd(i)
-#         #     Hzz_ψ!(qaoa, μ)
-#         # else
-#         #     Hx_ψ!(qaoa, μ)
-#         # end
-#         # μ *= -1.0*im
-        
-#         # ∇Eᵢ = 2 ℜ ⟨ λ | μ ⟩
-#         gradResult[i] = T2(2)*real(dot(λ, μ))
-#         if i > 1
-#             #|λ⟩ ← (Uᵢ)†|λ⟩
-#             applyQAOALayer!(qaoa, -params[i], i, λ)
-#         end
-#     end 
-#     return gradResult
-# end
-
-function gradCostFunction(qaoa::QAOA{T1, T2, T3}, params::Vector{T2}) where {T1 <:AbstractGraph, T2<: Real, T3<:AbstractBackend}
+function gradCostFunction(qaoa::QAOA{P, H, M}, params::Vector{T}) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
     # this will update/populate qaoa.state which we will call |λ⟩ following the paper
     λ = getQAOAState(qaoa, params) # U(Γ) |+⟩
     κ = copy(λ)
@@ -102,12 +61,12 @@ function gradCostFunction(qaoa::QAOA{T1, T2, T3}, params::Vector{T2}) where {T1 
     ϕ = copy(λ)
 
     # |λ⟩ := H |λ⟩
-    Hzz_ψ!(qaoa, λ)
+    Hc_ψ!(qaoa.HC, λ)
     
     # now we allocate |μ⟩
     μ = similar(λ)
 
-    gradResult = zeros(T2, length(params))
+    gradResult = zeros(T, length(params))
     
     for i in length(params):-1:1
         # |ϕ⟩ ← (Uᵢ)†|ϕ⟩    
@@ -118,16 +77,9 @@ function gradCostFunction(qaoa::QAOA{T1, T2, T3}, params::Vector{T2}) where {T1 
 
         # |μ⟩ ← dUᵢ/dθᵢ |μ⟩
         applyQAOALayerDerivative!(qaoa, params[i], i, μ, κ)
-        # applyQAOALayer!(qaoa, params[i], i, μ)
-        # if isodd(i)
-        #     Hzz_ψ!(qaoa, μ)
-        # else
-        #     Hx_ψ!(qaoa, μ)
-        # end
-        # μ *= -1.0*im
         
         # ∇Eᵢ = 2 ℜ ⟨ λ | μ ⟩
-        gradResult[i] = T2(2)*real(dot(λ, μ))
+        gradResult[i] = T(2)*real(dot(λ, μ))
         if i > 1
             #|λ⟩ ← (Uᵢ)†|λ⟩
             applyQAOALayer!(qaoa, -params[i], i, λ)
@@ -136,48 +88,47 @@ function gradCostFunction(qaoa::QAOA{T1, T2, T3}, params::Vector{T2}) where {T1 
     return gradResult
 end
 
-# function gradCostFunction!(qaoa::QAOA, gradTape::GradientTape{T}, params::AbstractVector{T}) where {T<: Real}
-#     # this will update/populate qaoa.state which we will call |λ⟩ following the paper
-#     gradTape.λ = getQAOAState(qaoa, params)
-    
-#     # |ϕ⟩ := |λ⟩
-#     gradTape.ϕ = copy(gradTape.λ)
+function gradCostFunction(qaoa::QAOA{P, H, M}, params::Vector{T}, Op!::Function) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
+    # this will update/populate qaoa.state which we will call |λ⟩ following the paper
+    λ = getQAOAState(qaoa, params) # U(Γ) |+⟩
+    κ = copy(λ)
+    # |ϕ⟩ := |λ⟩
+    ϕ = copy(λ)
 
-#     # |λ⟩ := H |λ⟩
-#     Hzz_ψ!(qaoa, gradTape.λ)
+    # |λ⟩ := Op |λ⟩
+    Op!(λ)
     
-#     # now we allocate |μ⟩
-#     # μ = similar(λ)
+    # now we allocate |μ⟩
+    μ = similar(λ)
 
-#     gradResult = zeros(T, length(params))
+    gradResult = zeros(T, length(params))
     
-#     for i ∈ length(params):-1:1
-#         # |ϕ⟩ ← (Uᵢ)†|ϕ⟩    
-#         applyQAOALayer!(qaoa, -params[i], i, gradTape.ϕ)
+    for i in length(params):-1:1
+        # |ϕ⟩ ← (Uᵢ)†|ϕ⟩    
+        applyQAOALayer!(qaoa, -params[i], i, ϕ)
         
-#         # |μ⟩ ← |ϕ⟩
-#         gradTape.μ .= gradTape.ϕ
+        # |μ⟩ ← |ϕ⟩
+        μ .= ϕ
 
-#         # |μ⟩ ← dUᵢ/dθᵢ |μ⟩
-#         applyQAOALayerDerivative!(qaoa, params[i], i, gradTape.μ)
+        # |μ⟩ ← dUᵢ/dθᵢ |μ⟩
+        applyQAOALayerDerivative!(qaoa, params[i], i, μ, κ)
         
-#         # ∇Eᵢ = 2 ℜ ⟨ λ | μ ⟩
-#         gradResult[i] = 2.0*real(dot(gradTape.λ, gradTape.μ))
-#         if i > 1
-#             #|λ⟩ ← (Uᵢ)†|λ⟩
-#             applyQAOALayer!(qaoa, -params[i], i, gradTape.λ)
-#         end
-#     end 
-#     return gradResult
-# end
-
+        # ∇Eᵢ = 2 ℜ ⟨ λ | μ ⟩
+        gradResult[i] = T(2)*real(dot(λ, μ))
+        if i > 1
+            #|λ⟩ ← (Uᵢ)†|λ⟩
+            applyQAOALayer!(qaoa, -params[i], i, λ)
+        end
+    end 
+    return gradResult
+end
 
 @doc raw"""
     geometricTensor(qaoa::QAOA, params::Vector{T}, ψ0::AbstractVector{Complex{T}}) where T<: Real
 Compute the geometricTensor of the QAOA cost function using adjoint (a reverse-mode) differentiation. We implement the algorithm 
 proposed in [*this reference*](https://arxiv.org/pdf/2011.02991.pdf)
 """
-function geometricTensor(qaoa::QAOA{T1, T, T3}, params::Vector{T}, ψ0::Vector{Complex{T}}) where {T1 <: AbstractGraph, T<: Real, T3<:AbstractBackend}
+function geometricTensor(qaoa::QAOA{P, H, M}, params::Vector{T}, ψ0::H) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
     T_vec = zeros(Complex{T}, length(params))
     L_mat = zeros(Complex{T}, length(params), length(params))
     G_mat = zeros(Complex{T}, length(params), length(params))
@@ -232,7 +183,7 @@ end
 Computes the cost function Hessian at the point ``\Gamma`` in parameter space. 
 The computation is done analytically since it has proven to be faster than the previous implementation using [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl) package
 """
-function hessianCostFunction(qaoa::QAOA{T1, T, T3}, Γ::Vector{T}; diffMode=:manual) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
+function hessianCostFunction(qaoa::QAOA{P, H, M}, Γ::Vector{T}; diffMode=:manual) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
     if diffMode==:forward
         matHessian = ForwardDiff.hessian(qaoa, Γ)
         return matHessian
@@ -264,8 +215,12 @@ function hessianCostFunction(qaoa::QAOA{T1, T, T3}, Γ::Vector{T}; diffMode=:man
     end
 end
 
-function ∂ψ(qaoa::QAOA{T1, T, T3}, Γ::Vector{T}, i::Int) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
-    ψ = plus_state(T3, T, qaoa.N)
+function ∂ψ(qaoa::QAOA{P, H, M}, Γ::Vector{T}, i::Int) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
+    ψ = plus_state(T, qaoa.N)
+    if isa(qaoa.ham, MtlArray)
+        ψ = ψ |> MtlArray
+    end
+
     @inbounds @simd for idx ∈ eachindex(Γ)
         if idx==i
             applyQAOALayerDerivative!(qaoa, Γ[idx], idx, ψ)
@@ -276,19 +231,22 @@ function ∂ψ(qaoa::QAOA{T1, T, T3}, Γ::Vector{T}, i::Int) where {T1<:Abstract
     return ψ
 end
 
-function ∂ψ(qaoa::QAOA{T1, T, T3}, Γ::Vector{T}, i::Int, j::Int) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
-    ψ = plus_state(T3, T, qaoa.N)
+function ∂ψ(qaoa::QAOA{P, H, M}, Γ::Vector{T}, i::Int, j::Int) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
+    ψ = plus_state(T, qaoa.N)
+    if isa(qaoa.ham, MtlArray)
+        ψ = ψ |> MtlArray
+    end
     @inbounds @simd for idx ∈ eachindex(Γ)
         if i==j
             if idx==i
                 applyQAOALayer!(qaoa, Γ[idx], idx, ψ)
                 if isodd(idx)
-                    Hzz_ψ!(qaoa, ψ)
-                    Hzz_ψ!(qaoa, ψ)
+                    Hc_ψ!(qaoa, ψ)
+                    Hc_ψ!(qaoa, ψ)
                     ψ .*= Complex{T}(-1)
                 else
-                    Hx_ψ!(qaoa, ψ)
-                    Hx_ψ!(qaoa, ψ)
+                    qaoa.mixer(ψ)
+                    qaoa.mixer(ψ)
                     ψ .*= Complex{T}(-1)
                 end
             else
@@ -305,7 +263,7 @@ function ∂ψ(qaoa::QAOA{T1, T, T3}, Γ::Vector{T}, i::Int, j::Int) where {T1<:
     return ψ
 end
 
-function hessianCostFunction(qaoa::QAOA{T1, T, T3}, Γ::Vector{T}, idx::Vector{Int}) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
+function hessianCostFunction(qaoa::QAOA{P, H, M}, Γ::Vector{T}, idx::Vector{Int}) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
     ψ = getQAOAState(qaoa, Γ)
     ψRow    = ∂ψ(qaoa, Γ, idx[1])
     ψCol    = ∂ψ(qaoa, Γ, idx[2])
@@ -336,7 +294,7 @@ Calculate the Hessian index of a stationary (it checks the gradient norm) point 
 The function first calculates the gradient of the cost function for the given `qaoa` and `Γ`. If `checks=true`, it asserts that the norm of this gradient is less than `tol`. It then calculates the Hessian matrix and its eigenvalues, and returns the count of eigenvalues less than zero.
 
 """
-function getHessianIndex(qaoa::QAOA{T1, T, T3}, Γ::Vector{T}; tol=T(1e-6)) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
+function getHessianIndex(qaoa::QAOA, Γ::Vector{T}; tol=T(1e-6)) where {T<:Real}
     gn = norm(gradCostFunction(qaoa, Γ))
     if gn ≥ tol; @show "Gradient norm is gn = $(gn) above the tolerance threshold. Check convergence" end
 

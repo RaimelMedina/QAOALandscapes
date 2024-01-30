@@ -1,12 +1,6 @@
-function plus_state(B::Type{<:CPUBackend}, T::Type{<:Real}, N::Int)
+function plus_state(T::Type{<:Real}, N::Int)
     return fill(Complex{T}(1/sqrt(1<<N)), 1<<N)
 end
-
-function plus_state(B::Type{<:METALBackend}, T::Type{<:Real}, N::Int)
-    return Metal.fill(Complex{T}(1/sqrt(1<<N)), 1<<N)
-end
-
-plus_state(T::Type{<:Real}, N::Int) = plus_state(CPUBackend, T, N)
 
 """
     getStateProjection(qaoa::QAOA, params, stateIndex::Vector{Int64})
@@ -25,7 +19,7 @@ The QAOA state is determined by the given parameters `params`.
 * `ψIndex`: Normalized projection of the QAOA state onto the state subspace.
 * `ψIndex_perp`: Normalized projection of the QAOA state onto the orthogonal complement of the state subspace.
 """
-function getStateProjection(qaoa::QAOA{T1, T, T3}, params::Vector{T}, gsIndex::Vector{Int}) where {T1<:AbstractGraph, T<:Real, T3<:CPUBackend}
+function getStateProjection(qaoa::QAOA{P, H, M}, params::Vector{T}, gsIndex::Vector{Int}) where {P, H, M, T<:Real}
     ψMin  = getQAOAState(qaoa, params)
     ψ = sum(map(x->_onehot(T3, Complex{T}, x, 1<<qaoa.N)*ψMin[x], gsIndex))[:]
 
@@ -90,29 +84,8 @@ function computationalBasisWeights(ψ, equivClasses)
     return map(x-> sum(abs2.(getindex(ψ, x))), equivClasses)
 end
 
-# function gsFidelity(qaoa::QAOA{T1, T, T3}, Γ::Vector{T}, gsIndex::Vector{Int}) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
-#     # get ground state positions#
-#     min = minimum(qaoa.HC |> real)
-#     pos = findall(x->isapprox(x, min), qaoa.HC |> real)
-#     ψ   = getQAOAState(qaoa, Γ)
-#     return sum(abs2.(getindex(ψ, pos)))
-# end
-
-# function gsFidelity(qaoa::QAOA{T1, T, T3}, Γ::Vector{T}) where {T1<:AbstractGraph, T<:Real, T3<:METALBackend}
-#     # get ground state positions#
-#     min = minimum(qaoa.HC |> real)
-
-#     pos = findall(x->isapprox(x, min), qaoa.HC |> Array |> real)
-#     ψ   = getQAOAState(qaoa, Γ) |> Array
-#     return sum(abs2.(getindex(ψ, pos)))
-# end
-
-function gsFidelity(qaoa::QAOA{T1, T, T3}, Γ::Vector{T}, gsIndex::Vector{Int}) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
-    if T3<:CPUBackend
-        return computationalBasisWeights(getQAOAState(qaoa, Γ), gsIndex) |> sum
-    else
-        return computationalBasisWeights(getQAOAState(qaoa, Γ), gsIndex |> MtlArray) |> sum
-    end
+function gsFidelity(qaoa::QAOA{P, H, M}, Γ::AbstractVector{T}, gsIndex::Vector{Int}) where {P, H, M, T<:Real}
+    return computationalBasisWeights(getQAOAState(qaoa, Γ), gsIndex) |> sum
 end
 
 

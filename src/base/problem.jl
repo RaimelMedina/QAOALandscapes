@@ -2,8 +2,11 @@ struct ClassicalProblem{T<:Real} <: AbstractProblem
     interactions::Dict{Vector{Int}, T}
     n::Int
     z2_sym::Bool
+    degree::Union{Int, Nothing}
+    weightedQ::Bool
 end
 
+Base.eltype(cp::ClassicalProblem{R}) where R<:Real = R
 nqubits(cp::ClassicalProblem)::Int = cp.n
 Base.length(cp::ClassicalProblem) = length(cp.interactions)
 locality(cp::ClassicalProblem) = maximum(map(length, keys(cp.interactions)))
@@ -25,6 +28,40 @@ function z2SymmetricQ(pairs::Vector{Pair{Vector{Int}, T}}) where T<:Real
     return foldl(*, map(z2SymmetricQ, pairs))
 end
 
+function regularQ(cp::ClassicalProblem{R}) where R <: Real
+    nint = length(cp)
+    adjmat = zeros(Int, cp.n, nint)
+
+    for (i, key) ∈ enumerate(keys(cp.interactions))
+        for j ∈ eachindex(key)
+            setindex!(adjmat, 1, [key[j], i])
+        end
+    end
+    term_degrees = sum(adjmat, dims=2)
+    if allequal(term_degrees)
+        return term_degrees[1]
+    else
+        return nothing
+    end
+end
+
+function regularQ(interactions::Dict, n::Int)
+    nint = length(interactions)
+    adjmat = zeros(Int, n, nint)
+
+    for (i, key) ∈ enumerate(keys(interactions))
+        for j ∈ eachindex(key)
+            setindex!(adjmat, 1, [key[j], i])
+        end
+    end
+    term_degrees = sum(adjmat, dims=2)
+    if allequal(term_degrees)
+        return term_degrees[1]
+    else
+        return nothing
+    end
+end
+
 function Base.show(io::IO, cp::ClassicalProblem{T}) where T<:Real
     if cp.z2_sym
         str = "Z₂ symmetric classical problem on $(cp.n) qubits with interactions terms:"
@@ -38,23 +75,31 @@ function Base.show(io::IO, cp::ClassicalProblem{T}) where T<:Real
 end
 
 function ClassicalProblem(T::Type{<:Real}, g::SimpleGraph{<:Int})
-    terms = Dict{Vector{Int}, T}([e.src, e.dst] => T(1) for e in edges(g)) 
-    return ClassicalProblem{T}(terms, nv(g), true)
+    terms = Dict{Vector{Int}, T}([e.src, e.dst] => T(1) for e in edges(g))
+    vertex_degree = degree(g)
+    dg = allequal(vertex_degree) ? vertex_degree[1] : nothing 
+    return ClassicalProblem{T}(terms, nv(g), true, dg, false)
 end
 
 function ClassicalProblem(g::SimpleWeightedGraph{<:Int, T}) where T<:Real
     terms = Dict{Vector{Int}, T}([e.src, e.dst] => weight(e) for e in edges(g)) 
-    return ClassicalProblem{T}(terms, nv(g), true)
+    vertex_degree = degree(g)
+    dg = allequal(vertex_degree) ? vertex_degree[1] : nothing 
+    return ClassicalProblem{T}(terms, nv(g), true, dg, true)
 end
 
 function ClassicalProblem(interaction::Pair{Vector{Int}, T}, n::Int) where T<:Real
     terms = Dict(interaction)
-    return ClassicalProblem{T}(terms, n, z2SymmetricQ(interaction))
+    return ClassicalProblem{T}(terms, n, z2SymmetricQ(interaction), nothing, true)
 end
 
 function ClassicalProblem(interactions::Vector{Pair{Vector{Int}, T}}, n::Int) where T<:Real
     terms = Dict(interactions)
-    return ClassicalProblem{T}(terms, n, z2SymmetricQ(interactions))
+    return ClassicalProblem{T}(terms, n, 
+    z2SymmetricQ(interactions), 
+    regularQ(terms, n), 
+    allequal(values(terms))
+    )
 end
 
 function hamiltonian(cp::ClassicalProblem{T}, sym_sector = true) where T

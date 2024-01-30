@@ -1,8 +1,10 @@
 module QAOALandscapes
 
-# Functions related to an arbitrary QAOA  
-export QAOA, HxDiag, HxDiagSymmetric, HzzDiag, HzzDiagSymmetric, generalClassicalHamiltonian,  getQAOAState, gradCostFunction, hessianCostFunction, geometricTensor
-export HessianCostFunction, optimizeParameters, optimizeParametersSlice, OptSetup
+
+# Functions related to an arbitrary QAOA
+export ClassicalProblem, hamiltonian, XMixer, AbstractProblem, AbstractMixer 
+export QAOA, getQAOAState, gradCostFunction, hessianCostFunction, geometricTensor
+export optimizeParameters, optimizeParametersSlice, OptSetup
 export plus_state, getInitialParameter, toFundamentalRegion!
 # Functions related to different initialization strategies
 # Interp
@@ -25,16 +27,15 @@ export goemansWilliamson
 export harvardGraph
 
 
-abstract type AbstractBackend end
-abstract type CPUBackend <: AbstractBackend end
-abstract type METALBackend <: AbstractBackend end
+
 abstract type AbstractProblem end
 abstract type AbstractMixer end
 
 export AbstractBackend, CPUBackend, METALBackend
 
-using Metal
 using Revise
+using Metal
+using GPUArrays
 using SparseArrays
 using Graphs
 using ForwardDiff
@@ -67,11 +68,10 @@ include(joinpath("base", "problem.jl"))
 include(joinpath("base", "x_mixer.jl"))
 include(joinpath("base", "qaoa.jl"))
 include(joinpath("base", "gradient.jl"))
-#include(joinpath("base", "hamiltonians.jl"))
 include(joinpath("base", "layers.jl"))
 include(joinpath("base", "optimization_settings.jl"))
 include(joinpath("base", "parameters.jl"))
-#include(joinpath("base", "gpu.jl"))
+
 
 
 
@@ -84,7 +84,6 @@ include(joinpath("experimental", "experimental.jl"))
 
 # inside /initializations
 include(joinpath("initializations", "fourier.jl"))
-include(joinpath("initializations", "excited.jl"))
 include(joinpath("initializations", "interp.jl"))
 include(joinpath("initializations", "greedy_ts.jl"))
 include(joinpath("initializations", "transition_states.jl"))
@@ -98,5 +97,5 @@ include(joinpath("utilities", "utils.jl"))
 include(joinpath("utilities", "state_utilities.jl"))
 
 
-include("harvard_instance.jl")
+include("test_instances.jl")
 end

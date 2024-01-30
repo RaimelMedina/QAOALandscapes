@@ -17,7 +17,7 @@ function applyExpX!(psi::Vector{T}, k::Int, cos_a::R, sin_a::R) where {T, R}
     return nothing
 end
 
-function applyExpLayer!(mixer::XMixer, psi::Vector{T}, β::R) where {T, R}
+function applyExpLayer!(mixer::XMixer, psi::AbstractVector{T}, β::R) where {T, R}
     cβ = cos(β)
     sβ = sin(β)
     
@@ -36,7 +36,7 @@ function applyExpLayer!(mixer::XMixer, psi::Vector{T}, β::R) where {T, R}
     return nothing
 end
 
-function kernelExpX!(psi::AbstractVector{T}, bitmask::Int, cos_a::K, sin_a::K) where {T, K}
+function kernelExpX!(psi::AbstractGPUArray{T}, bitmask::Int, cos_a::K, sin_a::K) where {T, K}
     index = thread_position_in_grid_1d() - 1
     if index & bitmask == 0
         i1 = index + 1
@@ -52,7 +52,7 @@ function kernelExpX!(psi::AbstractVector{T}, bitmask::Int, cos_a::K, sin_a::K) w
     return
 end
 
-function kernelExpXParity!(psi::AbstractVector{T}, dim::Int, cβ::K, sβ::K) where {T, K}
+function kernelExpXParity!(psi::AbstractGPUArray{T}, dim::Int, cβ::K, sβ::K) where {T, K}
     i = thread_position_in_grid_1d()
     val1 = psi[i]
     val2 = psi[dim-i+1]
@@ -63,7 +63,7 @@ function kernelExpXParity!(psi::AbstractVector{T}, dim::Int, cβ::K, sβ::K) whe
     return
 end
 
-function applyExpX!(psi::AbstractVector{T}, k::Int, cos_a::K, sin_a::K) where {T,K}
+function applyExpX!(psi::AbstractGPUArray{T}, k::Int, cos_a::K, sin_a::K) where {T,K}
     dim = length(psi)
     bitmask = 1 << (k-1)
     num_groups = dim ÷ MAX_THREADS
@@ -71,7 +71,7 @@ function applyExpX!(psi::AbstractVector{T}, k::Int, cos_a::K, sin_a::K) where {T
     return nothing
 end
 
-function applyExpLayer!(mixer::XMixer, psi::AbstractVector{T}, β::R) where {T, R}
+function applyExpLayer!(mixer::XMixer, psi::AbstractGPUArray{T}, β::R) where {T, R}
     cβ = cos(β)
     sβ = sin(β)
     
@@ -92,20 +92,20 @@ function applyExpLayer!(mixer::XMixer, psi::AbstractVector{T}, β::R) where {T, 
 end
 
 
-function applyExpLayer!(hc::Vector{T}, ψ::Vector{K}, γ::R) where {T, K, R}
-    @inbounds for i in eachindex(hc)
+function applyExpLayer!(hc::Vector{T}, ψ::AbstractVector{K}, γ::R) where {T, K, R}
+    for i in eachindex(hc)
         ψ[i] *= exp(-im * γ * hc[i])
     end
     return nothing
 end
 
-function kernelExpHC!(hc::AbstractVector{T}, ψ::AbstractVector{K}, γ::R) where {T, K, R}
+function kernelExpHC!(hc::AbstractGPUArray{T}, ψ::AbstractGPUArray{K}, γ::R) where {T, K, R}
     i = thread_position_in_grid_1d()
     ψ[i] *= exp(-im * γ * hc[i])
     return
 end
 
-function applyExpLayer!(hc::AbstractVector{T}, ψ::AbstractVector{K}, γ::R) where {T, K, R}
+function applyExpLayer!(hc::AbstractGPUArray{T}, ψ::AbstractGPUArray{K}, γ::R) where {T, K, R}
     dim = length(ψ)
     num_groups = dim ÷ MAX_THREADS
     @metal threads=MAX_THREADS groups=num_groups kernelExpHC!(hc, ψ, γ)
@@ -120,6 +120,45 @@ function applyQAOALayer!(q::QAOA{P, H, M}, elem::T, index::Int, ψ0::AbstractVec
     end
     return nothing
 end
+
+function applyQAOALayerDerivative!(qaoa::QAOA{P, H, M}, elem::T, pos::Int, state::AbstractVector{R}) where {P, H, M, T, R}
+    applyQAOALayer!(qaoa, elem, pos, state)
+    if isodd(pos)
+        Hc_ψ!(qaoa.HC, state)
+    else
+        qaoa.mixer(state)
+    end
+    for i in eachindex(state)
+        state[i] *= -im
+    end
+    return nothing
+end
+
+function applyQAOALayerDerivative!(qaoa::QAOA{P, H, M}, elem::T, pos::Int, state::AbstractVector{R}, result::AbstractVector{R}) where {P, H, M, T, R}
+    applyQAOALayer!(qaoa, elem, pos, state)
+    if isodd(pos)
+        Hc_ψ!(qaoa.HC, state)
+    else
+        qaoa.mixer(state, result)
+    end
+    for i in eachindex(state)
+        state[i] *= -im
+    end
+    return nothing
+end
+# function applyQAOALayerDerivative!(qaoa::QAOA{T1, T2}, elem::T2, pos::Int, state::AbstractVector{Complex{T2}}, result::Vector{Complex{T2}}) where {T1<:AbstractGraph, T2<:Real}
+#     applyQAOALayer!(qaoa, elem, pos, state)
+#     if isodd(pos)
+#         Hzz_ψ!(qaoa, state)
+#     else
+#         Hx_ψ!(qaoa, state, result)
+#     end
+#     for i in eachindex(state)
+#         state[i] *= Complex{T2}(-im)
+#     end
+#     return nothing
+# end
+
 # function applyExpX!(psi::Vector{Complex{T}}, k::Int, cos_a::T, sin_a::T) where T<:Real
 #     N = length(psi)
 #     bitmask = 1 << (k-1)
@@ -260,32 +299,6 @@ end
 #         applyExpHC!(q.HC, elem, ψ0)
 #     else
 #         applyExpHB!(ψ0, elem; parity_symmetry = q.parity_symmetry)
-#     end
-#     return nothing
-# end
-
-function applyQAOALayerDerivative!(qaoa::QAOA{P, H, M}, elem::T, pos::Int, state::AbstractVector{R}) where {P, H, M, T, R}
-    applyQAOALayer!(qaoa, elem, pos, state)
-    if isodd(pos)
-        Hc_ψ!(qaoa, state)
-    else
-        qaoa.mixer(state)
-    end
-    for i in eachindex(state)
-        state[i] *= Complex{T2}(-im)
-    end
-    return nothing
-end
-
-# function applyQAOALayerDerivative!(qaoa::QAOA{T1, T2}, elem::T2, pos::Int, state::AbstractVector{Complex{T2}}, result::Vector{Complex{T2}}) where {T1<:AbstractGraph, T2<:Real}
-#     applyQAOALayer!(qaoa, elem, pos, state)
-#     if isodd(pos)
-#         Hzz_ψ!(qaoa, state)
-#     else
-#         Hx_ψ!(qaoa, state, result)
-#     end
-#     for i in eachindex(state)
-#         state[i] *= Complex{T2}(-im)
 #     end
 #     return nothing
 # end

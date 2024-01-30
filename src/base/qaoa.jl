@@ -39,7 +39,7 @@ function QAOA(cp::ClassicalProblem{R}, ham::Vector{Complex{R}}, mixer::AbstractM
     return QAOA{K, T, M}(cp.n, cp, ham, mixer, ψ0)
 end
 
-function QAOA(cp::ClassicalProblem{R}, ham::AbstractVector{Complex{R}}, mixer::AbstractMixer) where R<:Real
+function QAOA(cp::ClassicalProblem{R}, ham::AbstractGPUArray{Complex{R}}, mixer::AbstractMixer) where R<:Real
     T = typeof(ham)
     M = typeof(mixer)
     K = typeof(cp)
@@ -74,16 +74,16 @@ with
 and ``H_B, H_C`` corresponding to the mixing and cost Hamiltonian correspondingly.
 """
 
-function getQAOAState(q::QAOA{P, H, M}, Γ::Vector{R}) where {P, H, M, R}
-    ψ = copy(q.initial_state)
+function getQAOAState(q::QAOA{P, H, M}, Γ::AbstractVector{T}) where {P, H, M, T}
+    ψ::AbstractVector{Complex{T}} = copy(q.initial_state)
     for i in eachindex(Γ)
         applyQAOALayer!(q, Γ[i], i, ψ)
     end
     return ψ
 end
 
-function getQAOAState(q::QAOA{P, H, M}, Γ::Vector{T}, ψ0::H) where {P, H, M, T}
-    ψ = copy(ψ0)
+function getQAOAState(q::QAOA{P, H, M}, Γ::AbstractVector{T}, ψ0::H) where {P, H, M, T}
+    ψ::AbstractVector{Complex{T}} = copy(ψ0)
     for i in eachindex(Γ)
         applyQAOALayer!(q, Γ[i], i, ψ)
     end
@@ -101,34 +101,16 @@ More specifically, it returns the following real number:
 ```
 """
 
-function (q::QAOA{P, H, M})(Γ::Vector{R}) where {P, H, M, R}
+function (q::QAOA{P, H, M})(Γ::AbstractVector{R}) where {P, H, M, R}
     ψ = getQAOAState(q, Γ)
     res = real(dot(ψ, q.HC .* ψ)) 
     return res
 end
 
-# function (q::QAOA{T1, T2, T3})(Γ::Vector{T}) where {T1 <: AbstractGraph, T2 <: Real, T3 <: AbstractBackend, T}
-#     ψ::AbstractVector{Complex{T2}} = getQAOAState(q, Γ)
-#     res = real(dot(ψ, q.HC .* ψ)) 
-#     return res
-# end
-
-# function (q::QAOA{T1, T2, T3})(Γ::Vector{T2}, Etarget::T2) where {T1 <: AbstractGraph, T2 <: Real, T3 <: AbstractBackend}
-#     ψ::AbstractVector{Complex{T2}} = getQAOAState(q, Γ)
-#     res::T2 = real(dot(ψ, ((q.HC .- Etarget) .^2) .* ψ)) 
-#     return res
-# end
-
-# function (q::QAOA)(Γ, Etarget)
-#     ψ::AbstractVector{Complex{eltype(Γ)}} = getQAOAState(q, Γ) 
-#     res = dot(ψ, ((q.HC .- Etarget) .^2) .* ψ)
-#     return res |> real
-# end
-
-# function energyVariance(q::QAOA{T1, T2, T3}, Γ::Vector{T2}) where {T1 <: AbstractGraph, T2 <: Real, T3 <: AbstractBackend}
-#     h_mean_squared = q(Γ)^2
-#     ψ = getQAOAState(q, Γ)
-#     h_squared_mean = dot(ψ, (q.HC .^2) .* ψ) |> real
-#     return h_squared_mean - h_mean_squared
-# end
+function energyVariance(q::QAOA{P, H, M}, Γ::AbstractVector{T}) where {P, H, M, T}
+    h_mean_squared = q(Γ)^2
+    ψ = getQAOAState(q, Γ)
+    h_squared_mean = dot(ψ, (q.HC .^2) .* ψ) |> real
+    return h_squared_mean - h_mean_squared
+end
 

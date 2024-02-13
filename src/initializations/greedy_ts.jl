@@ -1,9 +1,9 @@
-function greedySelect(qaoa::QAOA{T1, T, T3}, 
+function greedySelect(qaoa::QAOA{P, H, M}, 
     Γmin::Vector{T}; 
     ϵ=T(0.001), 
     setup=OptSetup(), 
     threaded=false
-    ) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
+    ) where {P, H, M, T<:Real}
 
     paramResult, energyResult = rollDownTS(qaoa, Γmin; ϵ=ϵ, setup=setup, threaded=threaded)
     # get key of minimum energy #
@@ -14,13 +14,13 @@ function greedySelect(qaoa::QAOA{T1, T, T3},
     return valMinimum[minIdx], paramResult[keyMinimum][minIdx]
 end
 
-function greedySelectFidelity(qaoa::QAOA{T1, T, T3}, 
+function greedySelectFidelity(qaoa::QAOA{P, H, M}, 
     Γmin::Vector{T},
     state_index::Int; 
     ϵ=T(0.001),
     setup=OptSetup(), 
     threaded=false
-    ) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
+    ) where {P, H, M, T<:Real}
 
     paramResult, _ = rollDownTS(qaoa, Γmin; ϵ=ϵ, setup=setup, threaded=threaded)
     
@@ -38,14 +38,14 @@ function greedySelectFidelity(qaoa::QAOA{T1, T, T3},
     return qaoa(vec_of_params[fid_idx]), vec_of_params[fid_idx]
 end
 
-function greedyOptimize(qaoa::QAOA{T1, T, T3}, 
+function greedyOptimize(qaoa::QAOA{P, H, M}, 
     Γ0::Vector{T}, 
     pmax::Int, 
     igamma::Int; 
     tsType="symmetric", 
     ϵ=T(0.001), 
     setup=OptSetup()
-    ) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
+    ) where {P, H, M, T<:Real}
 
     listMinima = Dict{Int, Tuple{T, Vector{T}}}()
     p = length(Γ0) ÷ 2
@@ -64,11 +64,11 @@ function greedyOptimize(qaoa::QAOA{T1, T, T3},
     return listMinima
 end
 
-function greedyOptimize(qaoa::QAOA{T1, T, T3}, Γ0::Vector{T}, 
+function greedyOptimize(qaoa::QAOA{P, H, M}, Γ0::Vector{T}, 
     pmax::Int; ϵ=T(0.001), 
     setup=OptSetup(), 
     threaded=false
-    ) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
+    ) where {P, H, M, T<:Real}
 
     listMinima = Dict{Int, Tuple{T, Vector{T}}}()
     p = length(Γ0) ÷ 2
@@ -88,13 +88,13 @@ function greedyOptimize(qaoa::QAOA{T1, T, T3}, Γ0::Vector{T},
     return listMinima
 end
 
-function greedyOptimizeFidelity(qaoa::QAOA{T1, T, T3}, Γ0::Vector{T}, 
+function greedyOptimizeFidelity(qaoa::QAOA{P, H, M}, Γ0::Vector{T}, 
     pmax::Int,
     state_index; 
     ϵ=T(0.001), 
     setup=OptSetup(), 
     threaded=false
-    ) where {T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
+    ) where {P, H, M, T<:Real}
 
     listMinima = Dict{Int, Tuple{T, Vector{T}}}()
     p = length(Γ0) ÷ 2

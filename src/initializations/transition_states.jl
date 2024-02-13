@@ -9,7 +9,7 @@ are the same as `Γp`
 # Keyword arguments
 * `tsType='symmetric'` Only strings values 'symmetric' and 'non_symmetric' are accepted
 """
-function transitionState(Γ::AbstractVector{T}, iγ::Int; tsType="symmetric", regularize=false) where T <: Real
+function transitionState(Γ::Vector{T}, iγ::Int; tsType="symmetric", regularize=false) where T <: Real
     p = length(Γ) ÷ 2
     β = Γ[2:2:2p]
     γ = Γ[1:2:2p]
@@ -38,7 +38,7 @@ Given an initial state `Γp::Vector{Float64}` of length ``2p`` it creates a matr
 The columns of ``M_{\rm{TS}}`` corresponds to the transition states associated with the initial minimum `Γp`. The first `p+1` 
 columns correspond to symmetric TS while the remaining `p` columns correspond to non-symmetric TS.
 """
-function transitionState(Γmin::AbstractVector{T}; regularize=false) where T<:Real
+function transitionState(Γmin::Vector{T}; regularize=false) where T<:Real
     p = length(Γmin) ÷ 2
     vectorOfTS = Vector{T}[]
     
@@ -77,13 +77,13 @@ that the obtained vectors have lower energy than the initial vector `Γmin`
 # Return
 * `result:Tuple`. The returned paramaters are as follows => `Γmin_m, Γmin_p, Emin_m, Emin_p, info_m, info_p`
 """
-function rollDownfromTS(qaoa::QAOA{T1, T, T3}, 
-    Γmin::AbstractVector{T}, 
+function rollDownfromTS(qaoa::QAOA{P, H, M}, 
+    Γmin::Vector{T}, 
     ig::Int; 
     ϵ=T(0.001), 
     tsType="symmetric", 
     setup=OptSetup()
-    ) where {T1 <:AbstractGraph, T<:Real, T3<:AbstractBackend}
+    ) where {P, H, M, T<:Real}
 
     ΓTs = transitionState(Γmin, ig, tsType=tsType)
     umin = getNegativeHessianEigvec(qaoa, Γmin, ig, tsType=tsType)["eigvec_approx"] |> Array
@@ -119,11 +119,11 @@ that the obtained vectors have lower energy than the initial vector `Γmin`
 # Return
 * `result:Tuple`. The returned paramaters are as follows => `Γmin_m, Γmin_p, Emin_m, Emin_p, info_m, info_p`
 """
-function rollDownTS(qaoa::QAOA{T1, T, T3}, Γmin::Vector{T}; 
+function rollDownTS(qaoa::QAOA{P, H, M}, Γmin::Vector{T}; 
     setup=OptSetup(),
     ϵ=T(0.001), 
     threaded=false
-    ) where {T1 <:AbstractGraph, T<:Real, T3<:AbstractBackend}
+    ) where {P, H, M, T<:Real}
 
     p                = length(Γmin) ÷ 2
     parametersResult = Dict{String, Vector{Vector{T}}}()  

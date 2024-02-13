@@ -15,10 +15,9 @@ function QAOAData(T::Type{<:Real}, g::G, pmax::Int; seed=123) where G<:AbstractG
     @time Γ0, E0 = getInitialParameter(qaoa);
     
     @show E0
-    stateEquivC = getEquivalentClasses(qaoa.HC |> real, rounding=true)
+    _, stateEquivC = getEquivalentClasses(qaoa.HC |> real, rounding=false)
     gs_energ, gs_states = qaoa.HC[stateEquivC[1][1]] |> real, stateEquivC[1]
     
-
     @info "---Starting collecting optimization data---"
     # interp_data   = interpOptimize(qaoa, Γ0, pmax, 1) 
     # @info "Finished collecting interp data"
@@ -45,7 +44,7 @@ function QAOAData(B::Type{<:METALBackend}, T::Type{<:Real}, g::G, pmax::Int; see
     @time Γ0, E0 = getInitialParameter(qaoa)
     
     @show E0
-    stateEquivC = getEquivalentClasses(qaoa.HC |> Array |> real, rounding=true)
+    _, stateEquivC = getEquivalentClasses(qaoa.HC |> Array |> real, rounding=false)
     gs_energ, gs_states = Array(qaoa.HC)[stateEquivC[1][1]] |> real, stateEquivC[1]
     
 

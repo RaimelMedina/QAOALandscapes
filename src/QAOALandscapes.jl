@@ -1,8 +1,10 @@
 module QAOALandscapes
 
-# Functions related to an arbitrary QAOA  
-export QAOA, HxDiag, HxDiagSymmetric, HzzDiag, HzzDiagSymmetric, generalClassicalHamiltonian,  getQAOAState, gradCostFunction, hessianCostFunction, geometricTensor
-export HessianCostFunction, optimizeParameters, optimizeParametersSlice, OptSetup
+
+# Functions related to an arbitrary QAOA
+export ClassicalProblem, hamiltonian, XMixer, AbstractProblem, AbstractMixer 
+export QAOA, getQAOAState, gradCostFunction, hessianCostFunction, geometricTensor
+export optimizeParameters, optimizeParametersSlice, OptSetup
 export plus_state, getInitialParameter, toFundamentalRegion!
 # Functions related to different initialization strategies
 # Interp
@@ -25,17 +27,17 @@ export goemansWilliamson
 export harvardGraph
 
 
-abstract type AbstractBackend end
-abstract type CPUBackend <: AbstractBackend end
-abstract type METALBackend <: AbstractBackend end
 
-export AbstractBackend, CPUBackend, METALBackend
+abstract type AbstractProblem end
+abstract type AbstractMixer end
 
-using Metal
 using Revise
+using Metal
+using GPUArrays
 using SparseArrays
 using Graphs
 using ForwardDiff
+using FiniteDiff
 using Random
 using ProgressMeter
 using SimpleWeightedGraphs
@@ -60,19 +62,22 @@ function setRandomSeed(seed::Int)
 end
 
 # inside /base/
+include(joinpath("base", "problem.jl"))
+include(joinpath("base", "x_mixer.jl"))
 include(joinpath("base", "qaoa.jl"))
 include(joinpath("base", "gradient.jl"))
-include(joinpath("base", "hamiltonians.jl"))
 include(joinpath("base", "layers.jl"))
 include(joinpath("base", "optimization_settings.jl"))
 include(joinpath("base", "parameters.jl"))
-include(joinpath("base", "gpu.jl"))
+
+
+
 
 # inside /classical
 include(joinpath("classical", "maxcut.jl"))
 
 # inside /experimental
-include(joinpath("experimental", "data_wrapper.jl"))
+#include(joinpath("experimental", "data_wrapper.jl"))
 include(joinpath("experimental", "experimental.jl"))
 
 # inside /initializations
@@ -90,5 +95,5 @@ include(joinpath("utilities", "utils.jl"))
 include(joinpath("utilities", "state_utilities.jl"))
 
 
-include("harvard_instance.jl")
+include("test_instances.jl")
 end

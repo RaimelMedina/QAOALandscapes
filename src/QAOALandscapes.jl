@@ -31,8 +31,6 @@ export harvardGraph
 abstract type AbstractProblem end
 abstract type AbstractMixer end
 
-export AbstractBackend, CPUBackend, METALBackend
-
 using Revise
 using Metal
 using GPUArrays
@@ -79,7 +77,7 @@ include(joinpath("base", "parameters.jl"))
 include(joinpath("classical", "maxcut.jl"))
 
 # inside /experimental
-include(joinpath("experimental", "data_wrapper.jl"))
+#include(joinpath("experimental", "data_wrapper.jl"))
 include(joinpath("experimental", "experimental.jl"))
 
 # inside /initializations

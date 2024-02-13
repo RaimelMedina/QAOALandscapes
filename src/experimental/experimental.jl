@@ -36,11 +36,11 @@ function Base.show(io::IO, inode::IdNodes)
 end
 
 
-function curateDict!(qaoa::QAOA, dict::Dict; sigdigits=5)
+function curateDict!(qaoa::QAOA, dict::Dict; rounding=true, sigdigits=5)
     # first let's check that there are no repeated keys in here
     keys_of_dict = collect(keys(dict))
     energy_of_keys = qaoa.(keys_of_dict)
-    energyEquivClasses = getEquivalentClasses(energy_of_keys; sigdigits=sigdigits)
+    _, energyEquivClasses = getEquivalentClasses(energy_of_keys; rounding=rounding, sigdigits=sigdigits)
     
     temp_vec = [0]
     num_redundant = 0

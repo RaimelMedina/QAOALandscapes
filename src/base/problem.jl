@@ -45,20 +45,24 @@ function regularQ(cp::ClassicalProblem{R}) where R <: Real
     end
 end
 
-function regularQ(interactions::Dict, n::Int)
+function regularQ(interactions::Dict, n::Int; adjmat_return=false)
     nint = length(interactions)
     adjmat = zeros(Int, n, nint)
 
     for (i, key) ∈ enumerate(keys(interactions))
         for j ∈ eachindex(key)
-            setindex!(adjmat, 1, [key[j], i])
+            adjmat[key[j], i] = 1
         end
     end
     term_degrees = sum(adjmat, dims=2)
     if allequal(term_degrees)
         return term_degrees[1]
     else
-        return nothing
+        if adjmat_return
+            return adjmat
+        else
+            return nothing
+        end
     end
 end
 
@@ -102,6 +106,14 @@ function ClassicalProblem(interactions::Vector{Pair{Vector{Int}, T}}, n::Int) wh
     )
 end
 
+function ClassicalProblem(terms::Dict{Vector{Int}, T}, n::Int) where T<:Real
+    return ClassicalProblem{T}(terms, n, 
+    z2SymmetricQ(terms), 
+    regularQ(terms, n), 
+    allequal(values(terms))
+    )
+end
+
 function hamiltonian(cp::ClassicalProblem{T}, sym_sector = true) where T
     function ham_density_element(x::Int, term::Vector{Int})
         elements = map(i->((x>>(i-1))&1), term)
@@ -125,7 +137,7 @@ function hamiltonian(cp::ClassicalProblem{T}, sym_sector = true) where T
         ham = zeros(Complex{T}, 2^(cp.n))
     end
 
-    @inbounds for i in eachindex(ham)
+    for i in eachindex(ham)
         ham[i] = ham_value(i-1)
     end
     return ham

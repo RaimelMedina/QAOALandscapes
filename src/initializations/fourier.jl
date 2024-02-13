@@ -13,8 +13,8 @@ function toFourierParams(Γ::Vector{T}, q::Int=length(Γ)÷2) where T<:Real
     coeffmat = fourierJacobian(T, p, q)
     
     Γu          = zeros(T, 2q)
-    Γu[1:2:2q] .= Γ[1:2:2p] * ((2/p)*(sin.(coeffmat ./ p))) .|> T
-    Γu[2:2:2q] .= Γ[2:2:2p] * ((2/p)*(cos.(coeffmat ./ p))) .|> T
+    Γu[1:2:2q] .= ((2/p)*(sin.(coeffmat ./ p)))' * Γ[1:2:2p] .|> T
+    Γu[2:2:2q] .= ((2/p)*(cos.(coeffmat ./ p)))' * Γ[2:2:2p] .|> T
     
     return Γu
 end

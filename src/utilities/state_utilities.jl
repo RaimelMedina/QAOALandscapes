@@ -21,7 +21,7 @@ The QAOA state is determined by the given parameters `params`.
 """
 function getStateProjection(qaoa::QAOA{P, H, M}, params::Vector{T}, gsIndex::Vector{Int}) where {P, H, M, T<:Real}
     ψMin  = getQAOAState(qaoa, params)
-    ψ = sum(map(x->_onehot(T3, Complex{T}, x, 1<<qaoa.N)*ψMin[x], gsIndex))[:]
+    ψ = sum(map(x->_onehot(Complex{T}, x, 1<<qaoa.N)*ψMin[x], gsIndex))[:]
 
     normState = norm(ψ)
     normalize!(ψ)
@@ -33,29 +33,9 @@ function getStateProjection(qaoa::QAOA{P, H, M}, params::Vector{T}, gsIndex::Vec
     return normState, normState_perp, ψ, ψ_perp
 end
 
-function getStateProjection(qaoa::QAOA{T1, T, T3}, params::Vector{T}, gsIndex::Vector{Int}) where {T1<:AbstractGraph, T<:Real, T3<:METALBackend}
-    ψMin  = getQAOAState(qaoa, params) # in the GPU
-    gsIndex_gpu = MtlArray(gsIndex)
-
-    ψ = Metal.zeros(T, 1<<qaoa.N)
-    for x ∈ gsIndex_gpu
-        ψ .+= _onehot(T3, Complex{T}, x, 1<<qaoa.N)*ψMin[x]
-    end
-
-    normState = norm(ψ)
-    normalize!(ψ)
-
-    ψ_perp    = ψMin - dot(ψ, ψMin)*ψ
-    normState_perp = norm(ψ_perp)
-    normalize!(ψ_perp)
-
-    return normState, normState_perp, ψ, ψ_perp
-end
-
-
-function getStateProjection(qaoa::QAOA{T1, T, T3}, ψinit::AbstractVector{Complex{T}}, gsIndex::Vector{Int}) where {T1<:AbstractGraph, T<:Real, T3<:CPUBackend}
+function getStateProjection(qaoa::QAOA{P, H, M}, ψinit::AbstractVector{T}, gsIndex::Vector{Int}) where {P, H, M, T}
     ψMin  = ψinit
-    ψ = sum(map(x->_onehot(T3, Complex{T}, x, 1<<qaoa.N)*ψMin[x], gsIndex))[:]
+    ψ = sum(map(x->_onehot(T, x, 1<<qaoa.N)*ψMin[x], gsIndex))[:]
 
     normState = norm(ψ)
     normalize!(ψ)
@@ -88,27 +68,10 @@ function gsFidelity(qaoa::QAOA{P, H, M}, Γ::AbstractVector{T}, gsIndex::Vector{
     return computationalBasisWeights(getQAOAState(qaoa, Γ), gsIndex) |> sum
 end
 
-
-function getSmallestEigenvalues(energy_vec::AbstractVector{Complex{T}}) where T<:Real
-    if typeof(energy_vec) <: MtlArray
-        energy_vec =  Array(energy_vec) .|> real
-    else
-        energy_vec = energy_vec .|> real    
-    end
-    min_energy = minimum(energy_vec)
-    return min_energy, findall(x->isapprox(x, min_energy), energy_vec)
-end
-
-function getSmallestEigenvalues(qaoa::QAOA{T1, T, T3}, k::Int) where {T1<:AbstractGraph, T<:Real, T3<:CPUBackend}
-    println("Returning eigenvalues with position of eigenvectors in the computational basis")
-    perm = partialsortperm(qaoa.HC .|> real, 1:k)
-    return qaoa.HC[perm] |> real, perm
-end
-
-function timeToSolution(qaoa::QAOA{T1, T, T3}, 
+function timeToSolution(qaoa::QAOA{P, H, M}, 
     Γ::Vector{T},
     gsIndex::Vector{Int}; 
-    pd=T(0.99)) where {T1<:AbstractGraph, T <:Real, T3<:AbstractBackend}
+    pd=T(0.99)) where {P, H, M, T <:Real}
 
     @debug "Here we are assuming that the cost Hamiltonian is classical!"
     p = length(Γ) ÷ 2

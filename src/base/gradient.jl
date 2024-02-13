@@ -216,8 +216,8 @@ function hessianCostFunction(qaoa::QAOA{P, H, M}, Γ::Vector{T}; diffMode=:manua
 end
 
 function ∂ψ(qaoa::QAOA{P, H, M}, Γ::Vector{T}, i::Int) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
-    ψ = plus_state(T, qaoa.N)
-    if isa(qaoa.ham, MtlArray)
+    ψ = copy(qaoa.initial_state)
+    if isa(qaoa.HC, MtlArray)
         ψ = ψ |> MtlArray
     end
 
@@ -232,8 +232,8 @@ function ∂ψ(qaoa::QAOA{P, H, M}, Γ::Vector{T}, i::Int) where {P<:AbstractPro
 end
 
 function ∂ψ(qaoa::QAOA{P, H, M}, Γ::Vector{T}, i::Int, j::Int) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
-    ψ = plus_state(T, qaoa.N)
-    if isa(qaoa.ham, MtlArray)
+    ψ = copy(qaoa.initial_state)
+    if isa(qaoa.HC, MtlArray)
         ψ = ψ |> MtlArray
     end
     @inbounds @simd for idx ∈ eachindex(Γ)
@@ -241,8 +241,8 @@ function ∂ψ(qaoa::QAOA{P, H, M}, Γ::Vector{T}, i::Int, j::Int) where {P<:Abs
             if idx==i
                 applyQAOALayer!(qaoa, Γ[idx], idx, ψ)
                 if isodd(idx)
-                    Hc_ψ!(qaoa, ψ)
-                    Hc_ψ!(qaoa, ψ)
+                    Hc_ψ!(qaoa.HC, ψ)
+                    Hc_ψ!(qaoa.HC, ψ)
                     ψ .*= Complex{T}(-1)
                 else
                     qaoa.mixer(ψ)

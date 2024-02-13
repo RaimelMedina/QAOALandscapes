@@ -59,13 +59,18 @@ function whichTSType(s::String)
     return vec[1], tsType
 end
 
-function _onehot(T::Type{<:Number}, i::Int, n::Int)
+function _onehot(B::Type{<:CPUBackend}, T::Type{<:Number}, i::Int, n::Int)
     (i>n || i<1) ? throw(ArgumentError("Wrong indexing of the unit vector. Please check!")) : nothing
     vec = zeros(T, n)
     vec[i] = T(1)
     return vec
 end
-
+function _onehot(B::Type{<:METALBackend}, T::Type{<:Number}, i::Int, n::Int)
+    (i>n || i<1) ? throw(ArgumentError("Wrong indexing of the unit vector. Please check!")) : nothing
+    vec = Metal.zeros(T, n)
+    vec[i] = T(1)
+    return vec
+end
 
 
 @doc raw"""
@@ -171,6 +176,7 @@ The elements are rounded to a certain number of significant digits (default is 5
 """
 function getEquivalentClasses(vec::Vector{T}; rounding=false, sigdigits = 5) where T <: Real
     println("Rounding of the elements is set to $(rounding)")
+
     dictUniqueElements = Dict{T, Vector{Int}}()
     temp_element = T(0)
     if rounding
@@ -196,16 +202,17 @@ function getEquivalentClasses(vec::Vector{T}; rounding=false, sigdigits = 5) whe
     return dictUniqueElements, data 
 end
 
+list(edge::T) where T<:AbstractEdge = Integer[edge.src, edge.dst] 
 
-function hc2Terms(T::Type{<:Real}, qaoa::QAOA{T1, T2, T3}) where {T1, T2, T3}
-    edge_list = collect(keys(qaoa.problem.interactions))
-    dict2LocalTerms = Dict{Vector{Int}, T}()
-    dict4LocalTerms = Dict{Vector{Int}, T}()
-    weight_list = values(qaoa.problem.interactions) |> collect
+function hc2Terms(qaoa::QAOA{T1, T2, T3}) where {T1<:AbstractGraph, T2<:Real, T3<:AbstractBackend}
+    edge_list = list.(collect(edges(qaoa.graph)))
+    dict2LocalTerms = Dict{Vector{Int}, T2}()
+    dict4LocalTerms = Dict{Vector{Int}, T2}()
+    weight_list = map(x->QAOALandscapes.getWeight(T2, x), edges(qaoa.graph))
     
     val_temp = Integer[]
-    weight_val = T(0)
-    id_counter = T(0)
+    weight_val = T2(0)
+    id_counter = T2(0)
     
     for (j, e1) in enumerate(edge_list)
         for (i, e2) in enumerate(edge_list)
@@ -234,20 +241,34 @@ function hc2Terms(T::Type{<:Real}, qaoa::QAOA{T1, T2, T3}) where {T1, T2, T3}
 end
 
 
-struct TaylorTermsTS{P, H, M, T}
-    qaoa::QAOA{P, H, M}
+struct TaylorTermsTS{T1<:AbstractGraph, T<:Real, T3<:AbstractBackend}
+    qaoa::QAOA{T1, T, T3}
     T0::T
-    T2h::H
-    T4h::H
+    T2h::AbstractVector{Complex{T}}
+    T4h::AbstractVector{Complex{T}}
 end
 
-function TaylorTermsTS(T::Type{<:Real}, qaoa::QAOA{T1, T2, T3}) where {T1, T2, T3}
-    id, dict_T2, dict_T4 = hc2Terms(T, qaoa)
-    T2h  = hamiltonian(ClassicalProblem(dict_T2, qaoa.N))
-    T4h  = hamiltonian(ClassicalProblem(dict_T4, qaoa.N))
-   
+function TaylorTermsTS(qaoa::QAOA{T1, T, T3}) where {T1<:AbstractGraph, T<:Real, T3<:CPUBackend}
+    id, dict_T2, dict_T4 = hc2Terms(qaoa)
+    T2h  = generalClassicalHamiltonian(Complex{T}, qaoa.N, dict_T2)
+    T4h  = generalClassicalHamiltonian(Complex{T}, qaoa.N, dict_T4)
+    
     @assert real((T2h + T4h) .+ id) ≈ real(qaoa.HC .^ 2)
-    return TaylorTermsTS{T1, T2, T3, T}(
+    return TaylorTermsTS{T1, T, T3}(
+        qaoa,
+        id,
+        T2h,
+        T4h
+    )
+end
+
+function TaylorTermsTS(qaoa::QAOA{T1, T, T3}) where {T1<:AbstractGraph, T<:Real, T3<:METALBackend}
+    id, dict_T2, dict_T4 = hc2Terms(qaoa)
+    T2h  = generalClassicalHamiltonian(Complex{T}, qaoa.N, dict_T2) |> MtlArray
+    T4h  = generalClassicalHamiltonian(Complex{T}, qaoa.N, dict_T4) |> MtlArray
+    
+    @assert real((T2h + T4h) .+ id) ≈ real(qaoa.HC .^ 2)
+    return TaylorTermsTS{T1, T, T3}(
         qaoa,
         id,
         T2h,
@@ -268,37 +289,28 @@ function T4Energy(taylor::TaylorTermsTS, Γ::Vector{T}) where T<:Real
 end
 
 function UT2ψ0(taylor::TaylorTermsTS, Γ::Vector{T}) where T<:Real
-    #z = Complex{T}(2^(- taylor.qaoa.N / 2))
-    z = copy(
-        taylor.qaoa.initial_state
-    )
+    z = Complex{T}(2^(- taylor.qaoa.N / 2))
     return getQAOAState(taylor.qaoa, Γ, z .* taylor.T2h)
 end
 
 function UT4ψ0(taylor::TaylorTermsTS, Γ::Vector{T}) where T<:Real
-    z = copy(
-        taylor.qaoa.initial_state
-    )
+    z = Complex{T}(2^(- taylor.qaoa.N / 2))
     return getQAOAState(taylor.qaoa, Γ, z .* taylor.T4h)
 end
 
 function UHCψ0(qaoa::QAOA, Γ::Vector{T}) where T<:Real
-    z = copy(
-        qaoa.initial_state
-    )
-    return getQAOAState(qaoa, Γ, z .* qaoa.HC)
+    z = Complex{T}(2^(-qaoa.N / 2))
+    return getQAOAState(qaoa, Γ, z * qaoa.HC)
 end
 
 function UHC2ψ0(qaoa::QAOA, Γ::Vector{T}) where T<:Real
     z = Complex{T}(2^(-qaoa.N / 2))
-    return getQAOAState(qaoa, Γ, z .* (qaoa.HC .^ 2))
+    return getQAOAState(qaoa, Γ, z * (qaoa.HC .^ 2))
 end
 
 function UHC2ψ0(taylor::TaylorTermsTS, Γ::Vector{T}) where T<:Real
-    z = copy(
-        taylor.qaoa.initial_state
-    )
-    return getQAOAState(taylor.qaoa, Γ, z .* (taylor.qaoa.HC .^ 2))
+    z = Complex{T}(2^(- taylor.qaoa.N / 2))
+    return getQAOAState(taylor.qaoa, Γ, z * (taylor.qaoa.HC .^ 2))
 end
 
 function UOϵψ0(taylor::TaylorTermsTS, Γ::Vector{T}, ϵ::T) where {T<:Real}

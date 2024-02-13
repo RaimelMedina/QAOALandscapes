@@ -1,28 +1,21 @@
-using Revise
 using QAOALandscapes
-
+using Revise
 using BenchmarkTools
 using ProfileView
 using Graphs
 using LinearAlgebra
 
-N = 14
+N = 18
 
-g = harvardGraph(Float64)
-qaoa = QAOA(Float64, g)
+g = random_regular_graph(22, 3)
+qaoa = QAOA(METALBackend, Float32, g)
 
-Γ0 = rand(2);
+Γtest = rand(100);
 toFundamentalRegion!(qaoa, Γtest)
 
 
-@benchmark optimizeParameters(qaoa, Γtest)
-
-@benchmark optimizeParameters(qaoa, Γtest)
-
-qaoa(Γtest)
 # @benchmark gradCostFunction(qaoa, Γtest)
 
-@profview qaoa(Γtest)
 
 ψ0 = plus_state(Float64, qaoa.N);
 ψ1 = plus_state(Float64, qaoa.N);

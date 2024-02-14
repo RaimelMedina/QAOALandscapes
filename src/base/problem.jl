@@ -143,55 +143,9 @@ function hamiltonian(cp::ClassicalProblem{T}, sym_sector = true) where T
     return ham
 end
 
-function Hc_ψ!(ham::AbstractVector{S}, ψ::AbstractVector{T}) where {S, T}
-    dim = length(ψ)
-    num_groups = dim ÷ MAX_THREADS
-
-    @metal threads=MAX_THREADS groups=num_groups kernelHCψ!(ham, ψ)
-    return nothing
-end
-
 function Hc_ψ!(ham::Vector{S}, ψ::Vector{T}) where {S, T}
     for i in eachindex(ψ)
         ψ[i] *= ham[i]
     end
     return nothing
 end
-
-# struct CostHamiltonian{P<:AbstractProblem, S<:AbstractVector}
-#     problem::P
-#     ham::S
-    
-#     function CostHamiltonian(::Type{<:MtlVector}, cp::ClassicalProblem{Float32})
-#         ham = hamiltonian(cp)
-#         P = typeof(cp)
-#         H = typeof(ham)
-#         return new{P, H}(cp, ham |> MtlArray)
-#     end
-#     function CostHamiltonian(cp::ClassicalProblem{R}) where R<:Real
-#         ham = hamiltonian(cp)
-#         P = typeof(cp)
-#         H = typeof(ham)
-#         return new{P, H}(cp, ham)
-#     end
-# end
-
-function kernelHCψ!(hc::AbstractVector{T}, psi::AbstractVector{R}) where {T, R}
-    i = thread_position_in_grid_1d()
-    psi[i] *= hc[i]
-    return
-end
-
-# function (cost_ham::CostHamiltonian{P, S<:MtlVector})(ψ::MtlVector{T}) where {P, S, T}
-#     dim = length(ψ)
-#     num_groups = dim ÷ MAX_THREADS
-
-#     @metal threads=MAX_THREADS groups=num_groups kernelHCψ!(cost_ham.ham, psi)
-# end
-
-# function (cost_ham::CostHamiltonian{P, S})(ψ::Vector{T}) where {P, S, T}
-#     for i in eachindex(ψ)
-#         ψ[i] *= qaoa.HC[i]
-#     end
-#     return nothing
-# end

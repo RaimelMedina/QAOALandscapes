@@ -56,3 +56,14 @@ function labs_interactions(T::Type{<:Real}, n::Int)
     end
     return interaction_pairs
 end
+
+function labs_hamiltonian(T::Type{<:Real}, n::Int)
+    prob = ClassicalProblem(labs_interactions(T, n), n)
+    ham  = hamiltonian(prob)
+    return n^2 ./ (2*ham)
+end
+
+xorsat_interactions = [[1, 2, 3], [1, 4, 5], [2, 6, 7], [3, 8, 9], [4, 10, 15], [5, 10, 11], [6, 11, 12], [7, 12, 13], [8, 13, 14], [9, 14, 15]];
+js = ones(length(xorsat_interactions));
+
+xorsat_dict(T::Type{<:Real}) = Dict(val => T(js[index]) for (index, val) ∈ enumerate(xorsat_interactions));

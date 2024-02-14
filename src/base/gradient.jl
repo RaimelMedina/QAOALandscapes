@@ -217,10 +217,9 @@ end
 
 function ∂ψ(qaoa::QAOA{P, H, M}, Γ::Vector{T}, i::Int) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
     ψ = copy(qaoa.initial_state)
-    if isa(qaoa.HC, MtlArray)
-        ψ = ψ |> MtlArray
-    end
-
+    # if typeof(qaoa.HC) <: AbstractGPUArray
+    #     ψ = ψ |> MtlArray
+    # end
     @inbounds @simd for idx ∈ eachindex(Γ)
         if idx==i
             applyQAOALayerDerivative!(qaoa, Γ[idx], idx, ψ)
@@ -233,9 +232,9 @@ end
 
 function ∂ψ(qaoa::QAOA{P, H, M}, Γ::Vector{T}, i::Int, j::Int) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
     ψ = copy(qaoa.initial_state)
-    if isa(qaoa.HC, MtlArray)
-        ψ = ψ |> MtlArray
-    end
+    # if isa(qaoa.HC, MtlArray)
+    #     ψ = ψ |> MtlArray
+    # end
     @inbounds @simd for idx ∈ eachindex(Γ)
         if i==j
             if idx==i

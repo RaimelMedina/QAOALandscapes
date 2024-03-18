@@ -4,7 +4,7 @@
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://raimelmedina.github.io/QAOALandscapes/dev/)
 
 
-QAOALandscapes is a Julia package for simulating the QAOA algorithm for MaxCut type problems with the goal of understanding and exploring the classical optimization landscape. We would like to understand why some of the heuristic initialization/optimization strategies out there work the way they do. Currently, three initialization/optimization strategies are implemented:
+QAOALandscapes is a Julia package for exactly simulating the QAOA algorithm for general p-spin problems with the goal of understanding and exploring the classical optimization landscape. We would like to understand why some of the heuristic initialization/optimization strategies out there work the way they do. Currently, three initialization/optimization strategies are implemented:
 
 - Transition states.
 - Interpolation (Interp) strategy.
@@ -29,14 +29,18 @@ using Graphs, Random
 n    = 10
 d    = 3  # for 3-regular random graphs
 pmax = 10 # maximum circuit depth to explore
-g    = random_regular_graph(n, d)
+g    = random_regular_graph(n, d) # 3-regular unweighted graph
+prob = ClassicalProblem(Float64, g)
 
-qaoa = QAOA(n, g, applySymmetries = true) # Uses the parity symmetry of the problem
-_, init_point, init_energy = getInitialParameter(qaoa, spacing = 0.01) # obtain initial parameters at p=1
+qaoa = QAOA(prob) # if the problem is Z2 symmetric then the algorithm will work in the correct Hilbert subspace
+init_point, init_energy = getInitialParameter(qaoa) # obtain initial parameters at p=1
 
 # Now choose a strategy
 # For example, for transition states we have implemented the Greedy strategy
 greedyData = greedyOptimize(qaoa, init_point, pmax);
+
+# If you prefer INTERP strategy
+interpData = interpOptimize(qaoa, init_point, pmax);
 ```
 
 ## Warning

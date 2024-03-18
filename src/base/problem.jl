@@ -34,10 +34,11 @@ function regularQ(cp::ClassicalProblem{R}) where R <: Real
 
     for (i, key) ∈ enumerate(keys(cp.interactions))
         for j ∈ eachindex(key)
-            setindex!(adjmat, 1, [key[j], i])
+            adjmat[key[j], i] = 1
         end
     end
     term_degrees = sum(adjmat, dims=2)
+    println(adjmat)
     if allequal(term_degrees)
         return term_degrees[1]
     else
@@ -92,6 +93,14 @@ function ClassicalProblem(g::SimpleWeightedGraph{<:Int, T}) where T<:Real
     return ClassicalProblem{T}(terms, nv(g), true, dg, true)
 end
 
+function ClassicalProblem(terms::Dict{Vector{Int}, T}, n::Int) where T<:Real
+    return ClassicalProblem{T}(terms, n, 
+    z2SymmetricQ(terms), 
+    regularQ(terms, n), 
+    !allequal(values(terms))
+    )
+end
+
 function ClassicalProblem(interaction::Pair{Vector{Int}, T}, n::Int) where T<:Real
     terms = Dict(interaction)
     return ClassicalProblem{T}(terms, n, z2SymmetricQ(interaction), nothing, true)
@@ -106,13 +115,25 @@ function ClassicalProblem(interactions::Vector{Pair{Vector{Int}, T}}, n::Int) wh
     )
 end
 
-function ClassicalProblem(terms::Dict{Vector{Int}, T}, n::Int) where T<:Real
-    return ClassicalProblem{T}(terms, n, 
-    z2SymmetricQ(terms), 
-    regularQ(terms, n), 
-    allequal(values(terms))
-    )
+function ClassicalProblem(T::Type{<:Real}, mat::BitMatrix, J::BitArray)
+    interactions = Dict{Vector{Int}, T}()
+    @assert size(mat, 1) == length(J)
+    N = size(mat, 2)
+    
+    for (i, h) in enumerate(eachrow(mat))
+        interactions[findall(x->x==1, h)] = J[i] |> T
+    end
+
+    rsum = sum(mat, dims=1)
+    zsum = sum(mat, dims=2)
+
+    degree = allequal(rsum) ? rsum[1] : nothing
+    z2     = allequal(iseven.(zsum)) ? true : false
+    weight = allequal(J)
+
+    return ClassicalProblem{T}(interactions, N, z2, degree, !weight)
 end
+
 
 function hamiltonian(cp::ClassicalProblem{T}, sym_sector = true) where T
     function ham_density_element(x::Int, term::Vector{Int})

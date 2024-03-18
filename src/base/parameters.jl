@@ -38,42 +38,74 @@ function toFundamentalRegion!(qaoa::QAOA{P, H, M},
     β = view(Γ, 2:2:2p)
     γ = view(Γ, 1:2:2p)
 
-    # First, folding β ∈ [-π/4, π/4]
-    for i=1:p #beta angles come first, they are between -pi/4, pi/4
-        β[i] = mod(β[i], π/2) |> T # folding beta to interval 0, pi/2
-        if β[i] > π/4 # translating it to -pi/4, pi/4 interval
-            β[i] -= T(π/2)
-        end
-    end
-
     problem_degree = qaoa.problem.degree
-    isWeightedG  = qaoa.problem.weightedQ
+    isWeightedG    = qaoa.problem.weightedQ
+    isZ2invariant  = qaoa.problem.z2_sym
+
+    # When HB-> XMixer then we know that βₗ ∈ [-π/2, π/2]
+    # If HC is not weighted then we can also restrict γₗ ∈ [-π/2, π/2]
+    β .= mod.(β, π) .|> T
+    β[β .> π/2] .-= T(π)
+    if !isWeightedG
+        γ .= mod.(γ, π) .|> T
+        γ[γ .> π/2] .-= T(π)
+    end
+    if isZ2invariant
+        β .= mod.(β, π/2) .|> T
+        β[β .> π/4] .-= T(π/2)
+    end
     if !isnothing(problem_degree) && reduce(*, isodd.(problem_degree)) && !isWeightedG
-        println("Entering")
-        # enter here if each vertex has odd degree d. Assuming regular graphs here :|
-        # also, this only works for unweighted d-regular random graphs 
         for i=1:p
-            γ[i] = mod(γ[i], π) |> T  # processing gammas by folding them to -pi/2, pi/2 interval
-            if γ[i] > π/2
-                γ[i] -=T(π)
-            end
             if abs(γ[i]) > π/4 # now folding them even more: to -pi/4, pi/4 interval
                 β[i:end] .*= -1 # this requires sign flip of betas!
                 γ[i] -= sign(γ[i])*π/2 |> T
             end
-            if γ[1] < 0 # making angle gamma_1 positive
-                β .*= -1 # by changing the sign of ALL angles
-                γ .*= -1
-            end
         end
-    # else
+    end
+    if γ[1] < 0 # making angle gamma_1 positive
+        β .*= -1 # by changing the sign of ALL angles
+        γ .*= -1
+    end
+    
+    # # First, folding β ∈ [-π/4, π/4]
+    # for i=1:p #beta angles come first, they are between -pi/4, pi/4
+    #     β[i] = mod(β[i], π/2) |> T # folding beta to interval 0, pi/2
+    #     if β[i] > π/4 # translating it to -pi/4, pi/4 interval
+    #         β[i] -= T(π/2)
+    #     end
+    # end
+
+    
+    # if !isnothing(problem_degree) && reduce(*, isodd.(problem_degree)) && !isWeightedG
+    #     println("Entering")
+    #     # enter here if each vertex has odd degree d. Assuming regular graphs here :|
+    #     # also, this only works for unweighted d-regular random graphs 
     #     for i=1:p
-    #         γ[i] = mod(γ[i], 2π)
+    #         γ[i] = mod(γ[i], π) |> T  # processing gammas by folding them to -pi/2, pi/2 interval
+    #         if γ[i] > π/2
+    #             γ[i] -=T(π)
+    #         end
+    #         if abs(γ[i]) > π/4 # now folding them even more: to -pi/4, pi/4 interval
+    #             β[i:end] .*= -1 # this requires sign flip of betas!
+    #             γ[i] -= sign(γ[i])*π/2 |> T
+    #         end
+    #         if γ[1] < 0 # making angle gamma_1 positive
+    #             β .*= -1 # by changing the sign of ALL angles
+    #             γ .*= -1
+    #         end
+    #     end
+    # elseif 
+    #     for i=1:p
+    #         γ[i] = mod2pi(γ[i])
     #         if γ[i] > π
     #             γ[i] -= T(2π)
     #         end
+    #         if γ[1] < 0
+    #             β .*= -1 # by changing the sign of ALL angles
+    #             γ .*= -1
+    #         end 
     #         #(mod(γ[i] + π, 2π) - π)
     #     end
-    end
+    # end
     return nothing
 end

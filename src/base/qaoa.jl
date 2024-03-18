@@ -53,7 +53,7 @@ function QAOA(cp::ClassicalProblem{R}, ham::AbstractGPUArray{Complex{R}}, mixer:
 end
 
 function Base.show(io::IO, qaoa::QAOA{P, H, M}) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer}
-    storage_str = (H <: MtlVector) ? "Metal-GPU" : "CPU"
+    storage_str = (H <: AbstractGPUArray) ? "Metal-GPU" : "CPU"
     str0 = "QAOA object on $(qaoa.N) qubits with mixer type `$(M)`. "
     str1 = "Running on the: -" * storage_str * "- backend."
     print(io, str0 * str1)

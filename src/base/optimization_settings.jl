@@ -113,13 +113,16 @@ It returns a tuple containing the following information
 """
 function optimizeParameters(::Val{:Fourier}, 
     qaoa::QAOA{P, H, M}, 
-    params::AbstractVector{T};
+    params::AbstractVector{T},
+    p::Int=length(params)÷2;
     setup = OptSetup()
     ) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
     
-    f(x::Vector{S}) where S<:Real = qaoa(fromFourierParams(x))
+    q = length(params) ÷ 2
+    
+    f(x::Vector{S}) where S<:Real = qaoa(fromFourierParams(x, p))
     function ∇f!(G, x::Vector{S}) where S<:Real
-        G .= gradCostFunctionFourier(qaoa, x)
+        G .= gradCostFunctionFourier(qaoa, x, p)
     end
 
     type_optim = typeof(setup.method)
@@ -136,7 +139,7 @@ function optimizeParameters(::Val{:Fourier},
         result = Optim.optimize(f, params, setup.method, setup.options)
     end
 
-    parameters = fromFourierParams(Optim.minimizer(result))
+    parameters = fromFourierParams(Optim.minimizer(result), p)
     cost       = Optim.minimum(result)
     convergence_info = Optim.converged(result)
     toFundamentalRegion!(qaoa, parameters)
@@ -228,7 +231,7 @@ function getInitialParameter(qaoa::QAOA{P, H, M};
     ) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer}
     
     T = qaoa.problem |> eltype
-    initial_points = rand(T, 2, num_points)
+    initial_points = rand(T, 2, num_points)*2π
     energies_points = zeros(T, num_points)
     params_points  = zeros(T, 2, num_points)
 
@@ -238,7 +241,7 @@ function getInitialParameter(qaoa::QAOA{P, H, M};
     
     (Einit, index) = findmin(energies_points)
     Γ = Vector(params_points[:, index])
-    toFundamentalRegion!(qaoa, Γ)
+    #toFundamentalRegion!(qaoa, Γ)
 
     return Γ, Einit
 end

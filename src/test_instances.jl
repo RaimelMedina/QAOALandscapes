@@ -25,17 +25,18 @@ harvardDictionary = Dict(
 function harvardGraph(T::Type{<:Real})
     graph = SimpleWeightedGraph(14)
     for k in keys(harvardDictionary)
-        add_edge!(graph, k[1], k[2], harvardDictionary[k] |> T)
+        add_edge!(graph, k[1], k[2], T(harvardDictionary[k]))
     end
     return graph
 end
 
 function labs_interactions(T::Type{<:Real}, n::Int)
     interaction_pairs = Dict{Vector{Int}, T}()
+    ofsset = sum(n-x for x ∈ 1:n-1)
     for i ∈ 1:n-3
         for t ∈ 1:floor(Int, (n-i-1)/2)
             for k ∈ (t+1):(n-i-t)
-                key = [i, i+t, i+k, i+k+t]
+                key = [i, i+t, i+k, i+k+t] |> sort
                 if haskey(interaction_pairs, key)
                     interaction_pairs[key] += T(2)
                 else
@@ -46,7 +47,7 @@ function labs_interactions(T::Type{<:Real}, n::Int)
     end
     for i ∈ 1:n-2
         for k ∈ 1:floor(Int, (n-i)/2)
-            key = [i, i+2k]
+            key = [i, i+2k] |> sort
             if haskey(interaction_pairs, key)
                 interaction_pairs[key] += T(1)
             else
@@ -54,16 +55,19 @@ function labs_interactions(T::Type{<:Real}, n::Int)
             end
         end
     end
-    return interaction_pairs
+    return interaction_pairs, ofsset
 end
 
 function labs_hamiltonian(T::Type{<:Real}, n::Int)
-    prob = ClassicalProblem(labs_interactions(T, n), n)
-    ham  = hamiltonian(prob)
-    return n^2 ./ (2*ham)
+    interactions, offset = labs_interactions(T, n)
+    prob = ClassicalProblem(interactions, n)
+    ham  = hamiltonian(prob) .+ offset
+    return -n^2 ./ (2*ham)
 end
 
-xorsat_interactions = [[1, 2, 3], [1, 4, 5], [2, 6, 7], [3, 8, 9], [4, 10, 15], [5, 10, 11], [6, 11, 12], [7, 12, 13], [8, 13, 14], [9, 14, 15]];
-js = ones(length(xorsat_interactions));
+xorsat_interactions = Dict(
+    6 =>[[1, 2, 3], [1, 2, 4], [2, 3, 5], [1, 3, 6]],
+    15=>[[1, 2, 3], [1, 4, 5], [2, 6, 7], [3, 8, 9], [4, 10, 15], [5, 10, 11], [6, 11, 12], [7, 12, 13], [8, 13, 14], [9, 14, 15]]
+);
 
-xorsat_dict(T::Type{<:Real}) = Dict(val => T(js[index]) for (index, val) ∈ enumerate(xorsat_interactions));
+xorsat_dict(T::Type{<:Real}, n::Int) = Dict(val => T(1) for (index, val) ∈ enumerate(xorsat_interactions[n]));

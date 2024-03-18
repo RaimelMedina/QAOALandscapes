@@ -31,41 +31,52 @@ function fromFourierParams(Γu::Vector{T}, p::Int=length(Γu) ÷ 2) where T<:Rea
     return Γnew
 end
 
-function fourierInitialization(Γmin::Vector{T}) where T<:Real
-    Γu   = toFourierParams(Γmin)
-    append!(Γu, [T(0), T(0)])
-    Γnew = fromFourierParams(Γu)
+function fourierInitialization(Γmin::Vector{T}, q::Int=length(Γmin)÷2) where T<:Real
+    p = length(Γmin) ÷ 2
+    if q < p
+        # then we convert to Fourier space and then back to real space but with p+1
+        Γu   = toFourierParams(Γmin, q)
+        Γnew = fromFourierParams(Γu, p+1)
+    else
+        # if q=p (as many frequencies as real-space parameters)
+        # then we add a new frequency and convert back to real space afterwards
+        Γu   = toFourierParams(Γmin, q)
+        append!(Γu, [T(0), T(0)])
+        Γnew = fromFourierParams(Γu)
+    end
     return Γnew
 end
 
-function gradCostFunctionFourier(qaoa::QAOA, Γu::Vector{T}) where T<:Real
-    p     = length(Γu) ÷ 2
-    Γ     = fromFourierParams(Γu)
+function gradCostFunctionFourier(qaoa::QAOA, Γu::Vector{T}, p::Int=length(Γu)÷2) where T<:Real
+    q     = length(Γu) ÷ 2
+    Γ     = fromFourierParams(Γu, p)
     gradΓ = gradCostFunction(qaoa, Γ)
     
-    coeffmat = fourierJacobian(T, p)
+    coeffmat = fourierJacobian(T, p, q)
     
-    gradΓu          = zeros(T, 2p)
-    gradΓu[1:2:2p] .= (sin.(coeffmat ./ p)) * gradΓ[1:2:2p] .|> T
-    gradΓu[2:2:2p] .= (cos.(coeffmat ./ p)) * gradΓ[2:2:2p] .|> T
+    gradΓu          = zeros(T, 2q)
+    gradΓu[1:2:2q] .= (sin.(coeffmat ./ p))' * gradΓ[1:2:2p] .|> T
+    gradΓu[2:2:2q] .= (cos.(coeffmat ./ p))' * gradΓ[2:2:2p] .|> T
     return gradΓu
 end
 
 struct FourierInitialization{T <: Real}
     params::Vector{Vector{T}}
     R::Int
+    q::Int
 end
 
-function FourierInitialization(qaoa::QAOA{P, H, M}, vec::Vector{T}, R::Int; α=T(0.6)) where {P, H, M, T}
+function FourierInitialization(qaoa::QAOA{P, H, M}, vec::Vector{T}, R::Int, q::Int=length(vec)÷2; α=T(0.6)) where {P, H, M, T}
     @assert R ≥ 0
+    p = length(vec) ÷ 2
     if R==0
-        return FourierInitialization([fourierInitialization(vec)], 0)
+        return FourierInitialization([fourierInitialization(vec, q)], 0, q)
     else
-        fvec  = toFourierParams(vec)
+        fvec  = toFourierParams(vec, q)
         
         # Eq B4 from paper https://browse.arxiv.org/pdf/1812.01041.pdf
         variance_vector = fvec .^ 2
-        mat_fvec = zeros(T, length(vec), R)
+        mat_fvec = zeros(T, length(fvec), R)
 
         for i in 1:size(mat_fvec)[1]
             distrib = Distributions.Normal(T(0), variance_vector[i])
@@ -75,36 +86,38 @@ function FourierInitialization(qaoa::QAOA{P, H, M}, vec::Vector{T}, R::Int; α=T
         end
 
         for i in 1:R
-            mat_fvec[:, i] .= fromFourierParams(mat_fvec[:, i])
-            toFundamentalRegion!(qaoa, view(mat_fvec, :, i)) 
+            mat_fvec[:, i] .= fromFourierParams(mat_fvec[:, i], p) # increase p here 
+            toFundamentalRegion!(qaoa, view(mat_fvec, :, i)) # fold back parameter into the fundamental region 
         end
 
-        new_params = [fourierInitialization(vec)]
+        new_params = [fourierInitialization(vec, q)]
         for i in 1:R
-            push!(new_params, fourierInitialization(mat_fvec[:, i]))
+            push!(new_params, fourierInitialization(mat_fvec[:, i], q))
         end
 
-        return FourierInitialization{T}(new_params, R)
+        return FourierInitialization{T}(new_params, R, q)
     end
 end
 
 function rollDownFourier(qaoa::QAOA{P, H, M}, 
     Γmin::Vector{T}, 
-    R::Int=0; 
+    R::Int=0,
+    q::Int=length(Γmin)÷2; 
     setup=OptSetup(),
     threaded=false
     ) where {P, H, M, T}
 
-    fourierInitData = FourierInitialization(qaoa, Γmin, R)
+    p = length(Γmin) ÷ 2
+    fourierInitData = FourierInitialization(qaoa, Γmin, R, q) # the parameters here are in real space
     
     if threaded
         fourierOptimData = ThreadsX.map(
-            x->optimizeParameters(Val(:Fourier), qaoa, toFourierParams(fourierInitData.params[x]), setup=setup),
+            x->optimizeParameters(Val(:Fourier), qaoa, toFourierParams(fourierInitData.params[x], q), p+1, setup=setup),
             1:R+1
         )
     else
         fourierOptimData = map(
-            x->optimizeParameters(Val(:Fourier), qaoa, toFourierParams(fourierInitData.params[x]), setup=setup),
+            x->optimizeParameters(Val(:Fourier), qaoa, toFourierParams(fourierInitData.params[x], q), p+1, setup=setup),
             1:R+1
         )
     end
@@ -130,7 +143,8 @@ By default the `BFGS` optimizer is used.
 function fourierOptimize(qaoa::QAOA{P, H, M}, 
     Γ0::Vector{T}, 
     pmax::Int, 
-    R::Int=0; 
+    R::Int=0,
+    q::Int=length(Γmin)÷2; 
     setup=OptSetup(),
     threaded=false
     ) where {P, H, M, T}
@@ -143,7 +157,7 @@ function fourierOptimize(qaoa::QAOA{P, H, M},
     iter = Progress(pmax-p; desc="Optimizing QAOA energy...")
 
     for t ∈ p+1:pmax
-        Γopt, Eopt = rollDownFourier(qaoa, listMinima[t-1][end], R, setup=setup, threaded=threaded)
+        Γopt, Eopt = rollDownFourier(qaoa, listMinima[t-1][end], R, q, setup=setup, threaded=threaded)
         listMinima[t] = (Eopt, Γopt)
         next!(iter; showvalues = [(:Circuit_depth, t), (:Energy, Eopt)])
     end

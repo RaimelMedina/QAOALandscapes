@@ -50,8 +50,7 @@ result = optimizeParameters(qaoa, params, method=Optim.BFGS(linesearch=Optim.Hag
 """
 function optimizeParameters(qaoa::QAOA{P, H, M}, 
     params::Vector{T};
-    setup = OptSetup(),
-    fun_calls=false
+    setup = OptSetup()
     ) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
     
     type_optim = typeof(setup.method)
@@ -78,7 +77,7 @@ function optimizeParameters(qaoa::QAOA{P, H, M},
     parameters = Optim.minimizer(result)
     cost       = Optim.minimum(result)
     convergence_info = Optim.converged(result)
-    num_fcalls = Optim.f_calls(result)
+
     toFundamentalRegion!(qaoa, parameters)
     if !convergence_info
         if qaoa(params) < cost
@@ -87,11 +86,7 @@ function optimizeParameters(qaoa::QAOA{P, H, M},
             println("Optimization did not converged but energy decreased")
         end
     end
-    if fun_calls==true
-        return parameters, cost, num_fcalls
-    else
-        return parameters, cost
-    end
+    return parameters, cost
 end
 
 @doc raw"""
@@ -125,9 +120,9 @@ function optimizeParameters(::Val{:Fourier},
     
     q = length(params) ÷ 2
     
-    f(x::Vector{S}) where S<:Real = qaoa(fromFourierParams(x))
+    f(x::Vector{S}) where S<:Real = qaoa(fromFourierParams(x, p))
     function ∇f!(G, x::Vector{S}) where S<:Real
-        G .= gradCostFunctionFourier(qaoa, x)
+        G .= gradCostFunctionFourier(qaoa, x, p)
     end
 
     type_optim = typeof(setup.method)
@@ -144,7 +139,7 @@ function optimizeParameters(::Val{:Fourier},
         result = Optim.optimize(f, params, setup.method, setup.options)
     end
 
-    parameters = fromFourierParams(Optim.minimizer(result))
+    parameters = fromFourierParams(Optim.minimizer(result), p)
     cost       = Optim.minimum(result)
     convergence_info = Optim.converged(result)
     toFundamentalRegion!(qaoa, parameters)
@@ -236,7 +231,7 @@ function getInitialParameter(qaoa::QAOA{P, H, M};
     ) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer}
     
     T = qaoa.problem |> eltype
-    initial_points = rand(T, 2, num_points)*2π
+    initial_points = rand(T, 2, num_points)
     energies_points = zeros(T, num_points)
     params_points  = zeros(T, 2, num_points)
 

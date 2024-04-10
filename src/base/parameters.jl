@@ -31,8 +31,8 @@ Finally, when dealing with regular graphs with odd degree `\gamma` paramaters ca
 This function modifies inplace the initial input vector ``Γ``. 
 """
 function toFundamentalRegion!(qaoa::QAOA{P, H, M}, 
-    Γ::Vector{T}
-    ) where {P, H, M, T}
+    Γ::AbstractVector{T}
+    ) where {P, H, M, T<:Real}
     
     p = length(Γ) ÷ 2
     β = view(Γ, 2:2:2p)

@@ -27,16 +27,15 @@ iter = Progress(lendataSet[N], desc="Collecting data for graphs of size N=$(N)..
 
 gpu==1 && println("Running simulations on the GPU")
 
+vec_of_data = Array{QAOAData, 1}(undef, lendataSet[N])
+
 for idx in 1:lendataSet[N]
-    @show idx
+    println("Working on instance $(idx) out of $(lendataSet[N])")
     g = load_graph_data(dir, N)[idx]
     if gpu==0
-        qaoa_data = QAOALandscapes.QAOAData(Float64, g, pmax)
-    else
-        qaoa_data = QAOALandscapes.QAOAData(METALBackend, Float32, g, pmax)
+        vec_of_data[idx] = QAOAData(Float64, g, pmax)
     end
-    
-    jldsave("data_N_$(N)_graph_$(idx)_pmax_$(pmax)_R_$(0).jld2"; qaoa_data)
-    
     next!(iter; showvalues = [(:instance, idx)])
 end
+
+jldsave("data_N_$(N)_pmax_$(pmax)_TS_1.jld2"; vec_of_data)

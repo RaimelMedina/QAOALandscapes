@@ -30,7 +30,7 @@ QAOALandscapes.setRandomSeed(seed)
 
 lendataSet = Dict(10=>18, 12=>34, 14=>55, 16=>40, 18=>40, 20=>40)
 dir = "../data"
-
+÷
 function load_graph_data(dir::String, N::Int)
     keyG   = "graph_list"
     fileG  = dir*"/unique_graphs_N_"*string(N)*".jld2"

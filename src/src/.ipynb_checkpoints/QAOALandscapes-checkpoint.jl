@@ -17,7 +17,6 @@ export transitionState, permuteHessian, getNegativeHessianEigval, getNegativeHes
 # General stationary points
 export getStationaryPoints, gradSquaredNorm, optimizeGradSquaredNorm, gad
 
-export QAOAData
 export Node, IdNodes, constructOptimizationGraph
 export TaylorTermsTS, Oϵ_ψ0, ψT2, ψT4, ψHC2
 
@@ -25,7 +24,7 @@ export TaylorTermsTS, Oϵ_ψ0, ψT2, ψT4, ψHC2
 export goemansWilliamson
 # Benchmark with respect to Harvard hard harvard instance
 export harvardGraph
-export labs_hamiltonian
+export labs_hamiltonian, labs_interactions, cRegular3XORSAT
 
 export xorsat_dict
 
@@ -42,7 +41,6 @@ using Revise
 using GPUArrays
 using SparseArrays
 using Graphs
-using Enzyme
 using ForwardDiff
 using Random
 using ProgressMeter
@@ -52,9 +50,11 @@ using LineSearches
 using LinearAlgebra
 using ThreadsX
 using Statistics
+using StatsBase
 using Distributions
 using Base.Threads
 using Combinatorics
+using KrylovKit
 using Convex
 using SCS
 
@@ -78,7 +78,7 @@ include(joinpath("base", "parameters.jl"))
 include(joinpath("classical", "maxcut.jl"))
 
 # inside /experimental
-include(joinpath("experimental", "data_wrapper.jl"))
+#include(joinpath("experimental", "data_wrapper.jl"))
 include(joinpath("experimental", "experimental.jl"))
 
 # inside /initializations

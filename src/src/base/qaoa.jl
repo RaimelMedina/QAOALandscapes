@@ -107,15 +107,10 @@ function (q::QAOA{P, H, M})(Γ::AbstractVector{R}) where {P, H, M, R}
     return res
 end
 
-function energyVariance(q::QAOA{P, H, M}, Γ::AbstractVector{T}) where {P, H, M, T<:Real}
+function energyVariance(q::QAOA{P, H, M}, Γ::AbstractVector{T}) where {P, H, M, T}
     h_mean_squared = q(Γ)^2
     ψ = getQAOAState(q, Γ)
     h_squared_mean = dot(ψ, (q.HC .^2) .* ψ) |> real
     return h_squared_mean - h_mean_squared
 end
 
-function energyVariance(q::QAOA{P, H, M}, ψ::AbstractVector{Complex{T}}) where {P, H, M, T}
-    h_mean_squared = real(dot(ψ, q.HC .* ψ))^2
-    h_squared_mean = dot(ψ, (q.HC .^2) .* ψ) |> real
-    return h_squared_mean - h_mean_squared
-end

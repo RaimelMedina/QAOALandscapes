@@ -20,42 +20,31 @@ The QAOA state is determined by the given parameters `params`.
 * `ψIndex_perp`: Normalized projection of the QAOA state onto the orthogonal complement of the state subspace.
 """
 function getStateProjection(qaoa::QAOA{P, H, M}, params::Vector{T}, gsIndex::Vector{Int}) where {P, H, M, T<:Real}
-    length(gsIndex) == 1 ? nothing : ArgumentError("Ground state is not unique! This could lead to wrong results")
     ψMin  = getQAOAState(qaoa, params)
-    # α = ⟨E₀|Γ⟩
-    
-    α  = getindex(ψMin, gsIndex[1])
-    GS = _onehot(Complex{T}, gsIndex[1], length(qaoa.initial_state))
+    ψ = sum(map(x->_onehot(Complex{T}, x, 1<<qaoa.N)*ψMin[x], gsIndex))[:]
 
-    # |ψₚ⟩ = |Γ⟩ - α |E₀⟩
+    normState = norm(ψ)
+    normalize!(ψ)
 
-    ψp = ψMin - α * GS
-    norm_ψp = norm(ψp)
-    normalize!(ψp)
+    ψ_perp    = ψMin - dot(ψ, ψMin)*ψ
+    normState_perp = norm(ψ_perp)
+    normalize!(ψ_perp)
 
-    @assert abs2(α) + norm_ψp^2 ≈ T(1)
-
-    return α, norm_ψp, GS, ψp
+    return normState, normState_perp, ψ, ψ_perp
 end
 
-function getStateProjection(qaoa::QAOA{P, H, M}, ψinit::AbstractVector{Complex{T}}, gsIndex::Vector{Int}) where {P, H, M, T<:Real}
-    length(gsIndex) == 1 ? nothing : ArgumentError("Ground state is not unique! This could lead to wrong results")
-    
-    ψMin  = copy(ψinit)
-    # α = ⟨E₀|Γ⟩
-    
-    α  = getindex(ψMin, gsIndex[1])
-    GS = _onehot(Complex{T}, gsIndex[1], length(qaoa.initial_state))
+function getStateProjection(qaoa::QAOA{P, H, M}, ψinit::AbstractVector{T}, gsIndex::Vector{Int}) where {P, H, M, T}
+    ψMin  = ψinit
+    ψ = sum(map(x->_onehot(T, x, 1<<qaoa.N)*ψMin[x], gsIndex))[:]
 
-    # |ψₚ⟩ = |Γ⟩ - α |E₀⟩
+    normState = norm(ψ)
+    normalize!(ψ)
 
-    ψp = ψMin - α * GS
-    norm_ψp = norm(ψp)
-    normalize!(ψp)
+    ψ_perp    = ψMin - dot(ψ, ψMin)*ψ
+    normState_perp = norm(ψ_perp)
+    normalize!(ψ_perp)
 
-    @assert abs2(α) + norm_ψp^2 ≈ T(1)
-
-    return α, norm_ψp, GS, ψp
+    return normState, normState_perp, ψ, ψ_perp
 end
 
 """

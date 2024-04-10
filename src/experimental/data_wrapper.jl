@@ -1,15 +1,19 @@
-struct QAOAData{G<:AbstractGraph, T<:Real, B<:AbstractBackend}
-    graph::G
+struct QAOAData{G<:AbstractProblem, T<:Real}
+    problem::G
     init_param::Vector{T}
     gs_energy::T
     gs_indices::Vector{Int}
-    # interp_data::AbstractVector{Parameter{T}}
-    fourier_data::AbstractVector{Parameter{T}}
+    optim_data::AbstractVector{Parameter{T}}
 end
 
 function QAOAData(T::Type{<:Real}, g::G, pmax::Int; seed=123) where G<:AbstractGraph
     setRandomSeed(seed)
-    qaoa    = QAOA(T, g)
+    if G <: SimpleWeightedGraph
+        prob = ClassicalProblem(g)
+    else
+        prob = ClassicalProblem(T, g)
+    end
+    qaoa = QAOA(prob)
 
     @info "Collecting initial parameters"
     @time Γ0, E0 = getInitialParameter(qaoa);
@@ -18,52 +22,45 @@ function QAOAData(T::Type{<:Real}, g::G, pmax::Int; seed=123) where G<:AbstractG
     _, stateEquivC = getEquivalentClasses(qaoa.HC |> real, rounding=false)
     gs_energ, gs_states = qaoa.HC[stateEquivC[1][1]] |> real, stateEquivC[1]
     
-    @info "---Starting collecting optimization data---"
-    # interp_data   = interpOptimize(qaoa, Γ0, pmax, 1) 
-    # @info "Finished collecting interp data"
-    
-    fourier  = interpOptimize(qaoa, Γ0, pmax)
-    @info "Finished collecting fourier data"
+    @info "---- Ground state energy is E₀ = $(gs_energ) \n"
 
-    # greedy_params  = Vector{Parameter{eltype(Γ0)}}(undef, pmax)
-    fourier_params = Vector{Parameter{eltype(Γ0)}}(undef, pmax)
+    @info "---Starting collecting optimization data---"
+    
+    local_minima  = fourierOptimize(qaoa, Γ0, pmax)
+    @info "Finished collecting greedy-1 data"
+
+    opt_params = Vector{Parameter{eltype(Γ0)}}(undef, pmax)
     
     for i ∈ 1:pmax
-        
-        fourier_params[i] = Parameter(fourier[i][2])
-        setvalue!(fourier_params[i], fourier[i][1])
+        opt_params[i] = Parameter(local_minima[i][2])
+        setvalue!(opt_params[i], local_minima[i][1])
     end
-    return QAOAData{typeof(g), T, CPUBackend}(g, Γ0, gs_energ, gs_states, fourier_params)
+    return QAOAData{typeof(prob), T}(prob, Γ0, gs_energ, gs_states, opt_params)
 end
 
-function QAOAData(B::Type{<:METALBackend}, T::Type{<:Real}, g::G, pmax::Int; seed=123) where G<:AbstractGraph
+function QAOAData(prob::ClassicalProblem{T}, pmax::Int; seed=123) where T<:Real
     setRandomSeed(seed)
-    qaoa    = QAOA(B, T, g)
+    qaoa = QAOA(prob)
 
     @info "Collecting initial parameters"
-    @time Γ0, E0 = getInitialParameter(qaoa)
+    @time Γ0, E0 = getInitialParameter(qaoa);
     
     @show E0
-    _, stateEquivC = getEquivalentClasses(qaoa.HC |> Array |> real, rounding=false)
-    gs_energ, gs_states = Array(qaoa.HC)[stateEquivC[1][1]] |> real, stateEquivC[1]
+    _, stateEquivC = getEquivalentClasses(qaoa.HC |> real, rounding=false)
+    gs_energ, gs_states = qaoa.HC[stateEquivC[1][1]] |> real, stateEquivC[1]
     
+    @info "---- Ground state energy is E₀ = $(gs_energ) \n"
 
     @info "---Starting collecting optimization data---"
-    # interp_data   = interpOptimize(qaoa, Γ0, pmax, 1) 
-    # @info "Finished collecting interp data"
     
-    fourier  = interpOptimize(qaoa, Γ0, pmax)
-    @info "Finished collecting fourier data"
+    local_minima  = fourierOptimize(qaoa, Γ0, pmax)
+    @info "Finished collecting greedy-1 data"
 
-    # greedy_params  = Vector{Parameter{eltype(Γ0)}}(undef, pmax)
-    fourier_params = Vector{Parameter{eltype(Γ0)}}(undef, pmax)
+    opt_params = Vector{Parameter{eltype(Γ0)}}(undef, pmax)
     
     for i ∈ 1:pmax
-        # greedy_params[i]  = Parameter(greedy[i][2])
-        # setvalue!(greedy_params[i], greedy[i][1])
-
-        fourier_params[i] = Parameter(fourier[i][2])
-        setvalue!(fourier_params[i], fourier[i][1])
+        opt_params[i] = Parameter(local_minima[i][2])
+        setvalue!(opt_params[i], local_minima[i][1])
     end
-    return QAOAData{typeof(g), T, METALBackend}(g, Γ0, gs_energ, gs_states, fourier_params)
+    return QAOAData{typeof(prob), T}(prob, Γ0, gs_energ, gs_states, opt_params)
 end

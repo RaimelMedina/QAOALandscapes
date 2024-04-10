@@ -78,3 +78,37 @@ function sk_problem(N::Int, σ::T) where T<:AbstractFloat
     interactions = Dict([i,j] =>rand(dist)/sqrt(N) for i ∈ 1:N for j ∈ i+1:N)
     return ClassicalProblem(interactions, N)
 end
+
+function cRegular3XORSAT(N::Int, M::Int, c::Int)
+    @assert M == (N*c) ÷ 3 "Number of spins, interactions, and regularity does not satisfy 3*M=N*c"
+    
+    adjH = falses(M, N) # rows -> interaction terms and columns -> spins
+
+    spinCounts = zeros(Int, N) # Track how many times each spin is used
+    interactions = Vector{Int}[] # Temporarily store interactions
+
+    while length(interactions) < M
+        possibleSpins = findall(x -> x < c, spinCounts) # Find spins used less than c times
+        if length(possibleSpins) >= 3
+            chosenSpins = sample(possibleSpins, 3, replace=false) # Randomly choose 3 different spins
+            for spin in chosenSpins
+                spinCounts[spin] += 1
+            end
+            push!(interactions, chosenSpins)
+        else
+            # Reset if stuck (unlikely, but can handle edge cases)
+            spinCounts .= 0
+            interactions = Vector{Int}[]
+        end
+    end
+
+    # Fill adjH based on interactions
+    for (i, interaction) in enumerate(interactions)
+        for spin in interaction
+            adjH[i, spin] = true
+        end
+    end
+    
+    J = (-1).^bitrand(M)
+    return adjH, J
+end

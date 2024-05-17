@@ -42,7 +42,6 @@ using Revise
 using GPUArrays
 using SparseArrays
 using Graphs
-using Enzyme
 using ForwardDiff
 using Random
 using ProgressMeter

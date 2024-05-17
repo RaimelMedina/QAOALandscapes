@@ -4,6 +4,7 @@ using ProgressMeter
 using Random
 using Graphs
 using Plots
+using JLD2
 
 g = random_regular_graph(10, 3);
 problem = ClassicalProblem(Float64, g)
@@ -11,11 +12,15 @@ qaoa = QAOA(problem)
 
 # optimization graph #
 Γinit, Einit = getInitialParameter(qaoa)
-opt_graph = constructOptimizationGraph(qaoa, Γinit, 4);
+opt_graph = constructOptimizationGraph(qaoa, Γinit, 8);
 
-_, energ_opt_graph, depths_opt_graph = QAOALandscapes.getEdgesFromOptGraph(qaoa, opt_graph)
+edges_opt_graph, energ_opt_graph, depths_opt_graph = QAOALandscapes.getEdgesFromOptGraph(qaoa, opt_graph)
 
-function warmOptimizeNewton(qaoa::QAOA, p::Int, npoints::Int; seed=123) where T<:AbstractFloat
+pwd()
+
+jldsave(pwd()*"/examples/data_test_p_8.jld2"; edges=edges_opt_graph, vertexW=energ_opt_graph, depth=depths_opt_graph)
+
+function warmOptimizeNewtonSaddles(qaoa::QAOA, p::Int, npoints::Int; seed=123)
     Random.seed!(seed)
     vector_of_Γs = rand(2p, npoints) * 2π
     
@@ -23,7 +28,7 @@ function warmOptimizeNewton(qaoa::QAOA, p::Int, npoints::Int; seed=123) where T<
     data_param = Vector{Float64}[]
 
     @showprogress for x ∈ axes(vector_of_Γs, 2)
-        temp = QAOALandscapes.modulatedNewton(qaoa, vector_of_Γs[:, x])
+        temp = QAOALandscapes.modulatedNewtonSaddles(qaoa, vector_of_Γs[:, x])
         push!(data_param, temp[1])
         push!(data_energ, temp[2])
     end
@@ -34,7 +39,7 @@ function warmOptimizeNewton(qaoa::QAOA, p::Int, npoints::Int; seed=123) where T<
     converged_energies = data_energ[converged_idx]
     converged_params   = data_param[converged_idx]
 
-    rounded_energies = round.(converged_energies, sigdigits=5)
+    rounded_energies = round.(converged_energies, digits=6)
     idx = unique(i->rounded_energies[i], eachindex(rounded_energies))
 
     println("$(length(idx)) unique converged points out of $(npoints) initial particles")
@@ -44,9 +49,11 @@ function warmOptimizeNewton(qaoa::QAOA, p::Int, npoints::Int; seed=123) where T<
 end
 
 
-params_p_2, energs_p_2 = warmOptimizeNewton(qaoa, 2, 1000)
-params_p_3, energs_p_3 = warmOptimizeNewton(qaoa, 3, 1500);
-params_p_4, energs_p_4 = warmOptimizeNewton(qaoa, 4, 1500)
+params_p_2, energs_p_2 = warmOptimizeNewtonSaddles(qaoa, 2, 1000);
+params_p_3, energs_p_3 = warmOptimizeNewtonSaddles(qaoa, 3, 1000; seed=456);
+params_p_4, energs_p_4 = warmOptimizeNewtonSaddles(qaoa, 4, 1000);
+
+
 
 energ_optgraph_p_2 = map(last, energ_opt_graph[depths_opt_graph .== 2])
 energ_optgraph_p_3 = map(last, energ_opt_graph[depths_opt_graph .== 3]);

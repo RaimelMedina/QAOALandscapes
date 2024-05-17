@@ -48,11 +48,11 @@ function Base.show(io::IO, inode::IdNodes)
 end
 
 
-function curateDict!(qaoa::QAOA, dict::Dict; rounding=true, sigdigits=5)
+function curateDict!(qaoa::QAOA, dict::Dict; rounding=true, digits=5)
     # first let's check that there are no repeated keys in here
     keys_of_dict = collect(keys(dict))
     energy_of_keys = qaoa.(keys_of_dict)
-    _, energyEquivClasses = getEquivalentClasses(energy_of_keys; rounding=rounding, sigdigits=sigdigits)
+    _, energyEquivClasses = getEquivalentClasses(energy_of_keys; rounding=rounding, digits=digits)
     
     temp_vec = [0]
     num_redundant = 0
@@ -72,7 +72,7 @@ function curateDict!(qaoa::QAOA, dict::Dict; rounding=true, sigdigits=5)
     end
 end
 
-function keepKthBestMinima!(qaoa::QAOA, dict::Dict, k::Int; sigdigits=5)
+function keepKthBestMinima!(qaoa::QAOA, dict::Dict, k::Int; digits=5)
     num_keys = length(keys(dict))
     if num_keys ≤ k
         return nothing
@@ -90,23 +90,23 @@ function keepKthBestMinima!(qaoa::QAOA, dict::Dict, k::Int; sigdigits=5)
     end
 end
 
-function find_approx_key(dict::Dict{K, V}, key::K; sigdigits=5) where {K, V}
-    rounded_key = round.(key, sigdigits=sigdigits)
+function find_approx_key(dict::Dict{K, V}, key::K; digits=5) where {K, V}
+    rounded_key = round.(key, digits=digits)
     for k in keys(dict)
-        if isapprox(rounded_key, round.(k, sigdigits=sigdigits))
+        if isapprox(rounded_key, round.(k, digits=digits))
             return k 
         end
     end
     return nothing
 end
 
-function rollDownTSWithNode!(dict, qaoa::QAOA, node::Node, generator::IDGenerator; sigdigits = 5, threaded=true)
+function rollDownTSWithNode!(dict, qaoa::QAOA, node::Node, generator::IDGenerator; digits = 5, threaded=true)
     pdict, _ = rollDownTS(qaoa, node.value; threaded=threaded)
     vecTemp = zeros(length(node)+2) # temporal vector to store the keys
     
     for k in keys(pdict)
         for j in 1:2 # + and - direction 
-            vecTemp = find_approx_key(dict, pdict[k][j]; sigdigits=sigdigits)
+            vecTemp = find_approx_key(dict, pdict[k][j]; digits=digits)
             if isnothing(vecTemp)
                 dict[pdict[k][j]] = IdNodes([node.id], generateId(generator))
             else
@@ -116,7 +116,7 @@ function rollDownTSWithNode!(dict, qaoa::QAOA, node::Node, generator::IDGenerato
     end
 end
 
-function constructPartialOptimizationGraph(qaoa::QAOA, Γ0::Vector{T}, pmax::Int; keep=5, sigdigits=5, threaded=true) where T<:Real
+function constructPartialOptimizationGraph(qaoa::QAOA, Γ0::Vector{T}, pmax::Int; keep=5, digits=5, threaded=true) where T<:Real
     @assert pmax ≥ 3
     generator = IDGenerator()
     node0 = Node([0], generateId(generator), Γ0)
@@ -134,7 +134,7 @@ function constructPartialOptimizationGraph(qaoa::QAOA, Γ0::Vector{T}, pmax::Int
         dictNew = Dict()
         @showprogress for k in keys(dict[p-1])
             node = Node(dict[p-1][k].parentId, dict[p-1][k].id, k)
-            rollDownTSWithNode!(dictNew, qaoa, node, generator; sigdigits=sigdigits, threaded=threaded)
+            rollDownTSWithNode!(dictNew, qaoa, node, generator; digits=digits, threaded=threaded)
         end
         curateDict!(qaoa, dictNew)
         keepKthBestMinima!(qaoa, dictNew, keep)
@@ -146,7 +146,7 @@ function constructPartialOptimizationGraph(qaoa::QAOA, Γ0::Vector{T}, pmax::Int
     return dict
 end
 
-function constructOptimizationGraph(qaoa::QAOA, Γ0::Vector{T}, pmax::Int; sigdigits=5, threaded=true) where T<:Real
+function constructOptimizationGraph(qaoa::QAOA, Γ0::Vector{T}, pmax::Int; digits=5, threaded=true) where T<:Real
     @assert pmax ≥ 3
     generator = IDGenerator()
     node0 = Node([0], generateId(generator), Γ0)
@@ -167,7 +167,7 @@ function constructOptimizationGraph(qaoa::QAOA, Γ0::Vector{T}, pmax::Int; sigdi
         
         @showprogress for k in keys(dict[p-1])
             node = Node(dict[p-1][k].parentId, dict[p-1][k].id, k)
-            rollDownTSWithNode!(dictNew, qaoa, node, generator; sigdigits=sigdigits, threaded=threaded)
+            rollDownTSWithNode!(dictNew, qaoa, node, generator; digits=digits, threaded=threaded)
         end
         #curateDict!(qaoa, dictNew)
         #keepKthBestMinima!(qaoa, dictNew, keep)

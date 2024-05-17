@@ -37,7 +37,7 @@ function applyExpLayer!(mixer::XMixer, psi::AbstractVector{T}, β::R) where {T, 
 end
 
 function applyExpLayer!(hc::Vector{T}, ψ::AbstractVector{K}, γ::R) where {T, K, R}
-    for i in eachindex(hc)
+    @simd for i in eachindex(hc)
         ψ[i] *= exp(-im * γ * hc[i])
     end
     return nothing

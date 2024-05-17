@@ -167,38 +167,6 @@ end
 
 
 function modulatedNewton(qaoa::QAOA{P, H, M}, Γ0::Vector{T}, niter::Int=400) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:AbstractFloat}
-    # # first fold parameter to fundamental region
-    # Γ = copy(Γ0) 
-    # toFundamentalRegion!(qaoa, Γ)
-    # dim = length(Γ)
-    # h = zeros(T, dim, dim)
-    # g = zeros(T, dim)
-
-    # energies = T[]
-    # #zeros(T, niter)
-    # parameters = Vector{T}[]
-    # vals = zeros(T, dim)
-    # vecs = zeros(T, dim, dim)
-    # for i ∈ 1:niter
-    #     g .= gradCostFunction(qaoa, Γ)
-    #     h .= hessianCostFunction(qaoa, Γ)
-
-    #     vals, vecs = eigen(h)
-    #     vals .= 1 ./ abs.(vals)
-    #     h .= vecs * diagm(vals) * vecs'
-        
-    #     Γ .-= h * g
-
-    #     toFundamentalRegion!(qaoa, Γ)
-        
-    #     push!(energies, qaoa(Γ))
-    #     push!(parameters, Γ)
-        
-    #     if norm(g) < 1e-6
-    #         break
-    #     end
-    # end 
-
     g!(G, x) = G .= gradCostFunction(qaoa, x)
     h!(H, x) = H .= hessianCostFunction(qaoa, x)
 
@@ -210,27 +178,37 @@ function modulatedNewton(qaoa::QAOA{P, H, M}, Γ0::Vector{T}, niter::Int=400) wh
 end
 
 function modulatedNewtonSaddles(qaoa::QAOA{P, H, M}, Γ0::Vector{T}, niter::Int=400) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:AbstractFloat}
-    # first fold parameter to fundamental region
-    Γ = copy(Γ0) 
+    # copy initial parameter
+    Γ = similar(Γ0)
+    Γ .= Γ0 
+    # fold parameter to fundamental region
     toFundamentalRegion!(qaoa, Γ)
     dim = length(Γ)
+    
+    ϵ = cbrt(eps(Float64))
+
+    # allocate matrix h for storing the hessian, and vector g for storing the gradient
     h = zeros(T, dim, dim)
     g = zeros(T, dim)
 
-    #energies = T[]
-    #zeros(T, niter)
-    #parameters = zeros(dim)
+    # to store the eigen-decomposition of the hessian
     vals = zeros(T, dim)
     vecs = zeros(T, dim, dim)
-    for i ∈ 1:niter
+    
+    for _ ∈ 1:niter
         g .= gradCostFunction(qaoa, Γ)
         h .= hessianCostFunction(qaoa, Γ)
-
-        vals, vecs = eigen(h)
+        
+        vals, vecs = eigen(hermitianpart(h))
         vals .= abs.(vals)
-        vals[end] *= -1
 
-        h .= vecs * diagm(1 ./ vals) * vecs'
+        # to avoid NaNs of Infs!
+        vals[vals .< ϵ] .+= ϵ
+
+        # aiming for index-1 saddle
+        vals[1] *= -1
+
+        h .= vecs * Diagonal(1 ./ vals) * vecs'
         Γ .= Γ - h * g
 
         toFundamentalRegion!(qaoa, Γ)

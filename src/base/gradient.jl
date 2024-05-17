@@ -183,11 +183,9 @@ end
 Computes the cost function Hessian at the point ``\Gamma`` in parameter space. 
 The computation is done analytically since it has proven to be faster than the previous implementation using [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl) package
 """
-function hessianCostFunction(qaoa::QAOA{P, H, M}, Γ::Vector{T}; diffMode=:reverse) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
-    if diffMode==:reverse
-        dim  = length(Γ)
-        grad(x) = gradCostFunction(qaoa, x)
-        return jacobian(Reverse, grad, Γ, Val(dim))
+function hessianCostFunction(qaoa::QAOA{P, H, M}, Γ::Vector{T}; diffMode=:mixed) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
+    if diffMode==:mixed
+        return ForwardDiff.jacobian(x->gradCostFunction(qaoa, x), Γ)
     elseif diffMode==:manual
         p = length(Γ) ÷ 2
         
@@ -212,7 +210,7 @@ function hessianCostFunction(qaoa::QAOA{P, H, M}, Γ::Vector{T}; diffMode=:rever
         end
         return matHessian
     else
-        throw(ArgumentError("diffMode=$(diffMode) not supported. Only ':manual' or ':reverse' methods are implemented"))
+        throw(ArgumentError("diffMode=$(diffMode) not supported. Only ':manual' or ':mixed' methods are implemented"))
     end
 end
 

@@ -41,7 +41,18 @@ greedyData = greedyOptimize(qaoa, init_point, pmax);
 
 # If you prefer INTERP strategy
 interpData = interpOptimize(qaoa, init_point, pmax);
+
+# Alternatively, you can also optimize a given set of parameters
+# directly
+initial_parameter = rand(20)
+optimal_param, optimal_energy = optimizeParameters(qaoa, initial_parameter)
 ```
+
+# Documentation
+Right now is not working but I'm working on that and it should be fixed soon.
+
+# GPU
+As of now, I don't know how to setup the package so that it automatically detects which GPU (if any) the user has. So for now, I recommend that after downloading the package you build it again by including the `gpu.jl` file and add the correspoding GPU package, i.e., `CUDA.jl` or `Metal.jl`. I plan to add support to AMD devices via `KernelAbstractions.jl` but that will come later
 
 ## Warning
 This is a work in progress and the code is very very rudimentary. I hope in this would be in a decent state to share sometime in the future. 

@@ -223,3 +223,14 @@ function modulatedNewtonSaddles(qaoa::QAOA{P, H, M}, Γ0::Vector{T}, niter::Int=
 
     return Γ, qaoa(Γ)
 end
+
+function findMinimaAdam(qaoa::QAOA{P, H, M}, Γ0::Vector{T}, niter::Int=5000) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:AbstractFloat}
+    gradTape = GradientTape(qaoa)
+    function g!(G,x)
+        gradient!(G, qaoa, gradTape, x)
+    end
+    result = Optim.optimize(qaoa, g!, Γ0, method=Adam(), iterations = niter)
+    opt_param = Optim.minimizer(result)
+    toFundamentalRegion!(qaoa, opt_param)
+    return opt_param, Optim.minimum(result)
+end

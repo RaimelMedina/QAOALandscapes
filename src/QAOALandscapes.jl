@@ -40,6 +40,7 @@ abstract type AbstractMixer end
 
 using Revise
 using GPUArrays
+using CUDA
 using SparseArrays
 using Graphs
 using ForwardDiff
@@ -71,6 +72,7 @@ include(joinpath("base", "gradient.jl"))
 include(joinpath("base", "layers.jl"))
 include(joinpath("base", "optimization_settings.jl"))
 include(joinpath("base", "parameters.jl"))
+include(joinpath("base", "gpu.jl"))
 
 
 # inside /classical

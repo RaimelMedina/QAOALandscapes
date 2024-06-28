@@ -59,9 +59,9 @@ function QAOA(cp::ClassicalProblem{R}, ham::AbstractGPUArray{Complex{R}}, mixer:
     K = typeof(cp)
     
     if z2SymmetricQ(cp)
-        ψ0 = Metal.fill(Complex{R}(1/sqrt(2^(cp.n-1))), 2^(cp.n-1))
+        ψ0 = CUDA.fill(Complex{R}(1/sqrt(2^(cp.n-1))), 2^(cp.n-1))
     else
-        ψ0 = Metal.fill(Complex{R}(1/sqrt(2^(cp.n))), 2^(cp.n))
+        ψ0 = CUDA.fill(Complex{R}(1/sqrt(2^(cp.n))), 2^(cp.n))
     end
     return QAOA{K, T, M}(cp.n, cp, ham, mixer, ψ0)
 end
@@ -89,7 +89,7 @@ and ``H_B, H_C`` corresponding to the mixing and cost Hamiltonian respectively.
 """
 
 function getQAOAState(q::QAOA{P, H, M}, Γ::AbstractVector{T}) where {P, H, M, T}
-    ψ::AbstractVector{Complex{T}} = copy(q.initial_state)
+    ψ::H = copy(q.initial_state)
     for i in eachindex(Γ)
         applyQAOALayer!(q, Γ[i], i, ψ)
     end

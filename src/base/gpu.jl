@@ -143,7 +143,7 @@
 #     end
 #     return nothing
 # end
-function kernelExpX!(psi::AbstractGPUArray{T}, bitmask::Int, cos_a::K, sin_a::K) where {T, K}
+function kernelExpX!(psi::CuDeviceArray{T}, bitmask::Int, cos_a::K, sin_a::K) where {T, K}
     # index = thread_position_in_grid_1d() - 1
     index = threadIdx().x - 1
     if index & bitmask == 0
@@ -160,7 +160,7 @@ function kernelExpX!(psi::AbstractGPUArray{T}, bitmask::Int, cos_a::K, sin_a::K)
     return
 end
 
-function kernelExpXParity!(psi::AbstractGPUArray{T}, dim::Int, cβ::K, sβ::K) where {T, K}
+function kernelExpXParity!(psi::CuDeviceArray{T}, dim::Int, cβ::K, sβ::K) where {T, K}
     # i = thread_position_in_grid_1d()
     i = threadIdx().x
     val1 = psi[i]
@@ -172,7 +172,7 @@ function kernelExpXParity!(psi::AbstractGPUArray{T}, dim::Int, cβ::K, sβ::K) w
     return
 end
 
-function applyExpX!(psi::AbstractGPUArray{T}, k::Int, cos_a::K, sin_a::K) where {T,K}
+function applyExpX!(psi::CuDeviceArray{T}, k::Int, cos_a::K, sin_a::K) where {T,K}
     dim = length(psi)
     bitmask = 1 << (k-1)
     num_groups = dim ÷ MAX_THREADS
@@ -180,14 +180,14 @@ function applyExpX!(psi::AbstractGPUArray{T}, k::Int, cos_a::K, sin_a::K) where 
     return nothing
 end
 
-function kernelExpHC!(hc::AbstractGPUArray{T}, ψ::AbstractGPUArray{K}, γ::R) where {T, K, R}
+function kernelExpHC!(hc::CuDeviceArray{T}, ψ::CuDeviceArray{K}, γ::R) where {T, K, R}
     # i = thread_position_in_grid_1d()
     i = threadIdx().x
     ψ[i] *= exp(-im * γ * hc[i])
     return
 end
 
-function applyExpLayer!(hc::AbstractGPUArray{T}, ψ::AbstractGPUArray{K}, γ::R) where {T, K, R}
+function applyExpLayer!(hc::CuDeviceArray{T}, ψ::CuDeviceArray{K}, γ::R) where {T, K, R}
     dim = length(ψ)
     num_groups = dim ÷ MAX_THREADS
     @cuda threads=MAX_THREADS blocks=num_groups kernelExpHC!(hc, ψ, γ)
@@ -195,7 +195,7 @@ function applyExpLayer!(hc::AbstractGPUArray{T}, ψ::AbstractGPUArray{K}, γ::R)
 end
 
 
-function kernelHCψ!(hc::AbstractGPUArray{T}, psi::AbstractGPUArray{R}) where {T, R}
+function kernelHCψ!(hc::CuDeviceArray{T}, psi::CuDeviceArray{R}) where {T, R}
     # i = thread_position_in_grid_1d()
     i = threadIdx().x
     psi[i] *= hc[i]
@@ -203,7 +203,7 @@ function kernelHCψ!(hc::AbstractGPUArray{T}, psi::AbstractGPUArray{R}) where {T
 end
 
 
-function Hc_ψ!(ham::AbstractGPUArray{S}, ψ::AbstractGPUArray{T}) where {S, T}
+function Hc_ψ!(ham::CuDeviceArray{S}, ψ::CuDeviceArray{T}) where {S, T}
     dim = length(ψ)
     num_groups = dim ÷ MAX_THREADS
 
@@ -213,7 +213,7 @@ end
 
 #### METAL kernels ########
 #### kernels for HB|ψ⟩ ####
-function kernel_x_mixer!(psi::AbstractGPUArray{T}, bitmask::Int, result::AbstractGPUArray{T}) where T<:Complex
+function kernel_x_mixer!(psi::CuDeviceArray{T}, bitmask::Int, result::CuDeviceArray{T}) where T<:Complex
     # index = thread_position_in_grid_1d() - 1
     index = threadIdx().x - 1
     i1 = index + 1
@@ -226,7 +226,7 @@ function kernel_x_mixer!(psi::AbstractGPUArray{T}, bitmask::Int, result::Abstrac
     return nothing
 end
 
-function kernel_x_mixer_parity!(psi::AbstractGPUArray{T}, dim::Int, result::AbstractGPUArray{T}) where T<:Complex
+function kernel_x_mixer_parity!(psi::CuDeviceArray{T}, dim::Int, result::CuDeviceArray{T}) where T<:Complex
     # i = thread_position_in_grid_1d()
     i = threadIdx().x
     psi[i]       += result[dim-i+1]
@@ -235,7 +235,7 @@ function kernel_x_mixer_parity!(psi::AbstractGPUArray{T}, dim::Int, result::Abst
     return nothing
 end
 
-function (hamX::XMixer)(ψ::AbstractGPUArray{T}, temp_ψ::AbstractGPUArray{T}) where T <: Complex
+function (hamX::XMixer)(ψ::CuDeviceArray{T}, temp_ψ::CuDeviceArray{T}) where T <: Complex
     dim = length(ψ)
     N = dim |> log2 |> Int
     @assert N == hamX.N || N + 1 == hamX.N
@@ -255,7 +255,7 @@ function (hamX::XMixer)(ψ::AbstractGPUArray{T}, temp_ψ::AbstractGPUArray{T}) w
     return nothing
 end
 
-function (hamX::XMixer)(ψ::AbstractGPUArray{T}) where T <: Complex
+function (hamX::XMixer)(ψ::CuDeviceArray{T}) where T <: Complex
     dim = length(ψ)
     N = dim |> log2 |> Int
     @assert N == hamX.N || N + 1 == hamX.N
@@ -263,7 +263,7 @@ function (hamX::XMixer)(ψ::AbstractGPUArray{T}) where T <: Complex
     num_groups = dim ÷ MAX_THREADS
     num_groups_parity = (dim ÷ 2) ÷ MAX_THREADS
     
-    temp_ψ::AbstractGPUArray{T} = copy(ψ)
+    temp_ψ::CuDeviceArray{T} = copy(ψ)
 
     for qubit in 1:N
         mask = 1 << (qubit - 1)
@@ -275,7 +275,7 @@ function (hamX::XMixer)(ψ::AbstractGPUArray{T}) where T <: Complex
     return nothing
 end
 
-function applyExpLayer!(mixer::XMixer, psi::AbstractGPUArray{T}, β::R) where {T, R}
+function applyExpLayer!(mixer::XMixer, psi::CuDeviceArray{T}, β::R) where {T, R}
     cβ = cos(β)
     sβ = sin(β)
     

@@ -115,7 +115,7 @@ function ClassicalProblem(interactions::Vector{Pair{Vector{Int}, T}}, n::Int) wh
     )
 end
 
-function ClassicalProblem(T::Type{<:Real}, mat::BitMatrix, J::BitArray)
+function ClassicalProblem(T::Type{<:Real}, mat::BitMatrix, J::Vector{Int})
     interactions = Dict{Vector{Int}, T}()
     @assert size(mat, 1) == length(J)
     N = size(mat, 2)
@@ -128,7 +128,7 @@ function ClassicalProblem(T::Type{<:Real}, mat::BitMatrix, J::BitArray)
     zsum = sum(mat, dims=2)
 
     degree = allequal(rsum) ? rsum[1] : nothing
-    z2     = allequal(iseven.(zsum)) ? true : false
+    z2     = prod(iseven.(zsum))
     weight = allequal(J)
 
     return ClassicalProblem{T}(interactions, N, z2, degree, !weight)
@@ -139,7 +139,7 @@ function hamiltonian(cp::ClassicalProblem{T}, sym_sector = true) where T
     function ham_density_element(x::Int, term::Vector{Int})
         elements = map(i->((x>>(i-1))&1), term)
         idx      = foldl(⊻, elements)
-        val      = Complex{T}(((-1)^idx)*cp.interactions[term])
+        val = Complex{T}(((-1)^idx)*cp.interactions[term])
         return val
     end
 

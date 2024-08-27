@@ -170,7 +170,7 @@ function modulatedNewton(qaoa::QAOA{P, H, M}, Γ0::Vector{T}, niter::Int=400) wh
     g!(G, x) = G .= gradCostFunction(qaoa, x)
     h!(H, x) = H .= hessianCostFunction(qaoa, x)
 
-    results = Optim.optimize(qaoa, g!, h!, Γ0, method=Optim.Newton())
+    results = Optim.optimize(qaoa, g!, h!, Γ0, method=Optim.Newton(), iterations=niter)
     parameters = Optim.minimizer(results)
     energies = Optim.minimum(results)
     toFundamentalRegion!(qaoa, parameters)
@@ -224,7 +224,7 @@ function modulatedNewtonSaddles(qaoa::QAOA{P, H, M}, Γ0::Vector{T}, niter::Int=
     return Γ, qaoa(Γ)
 end
 
-function findMinimaAdam(qaoa::QAOA{P, H, M}, Γ0::Vector{T}, niter::Int=5000) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:AbstractFloat}
+function findMinimaAdam(qaoa::QAOA{P, H, M}, Γ0::Vector{T}, niter::Int=300) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:AbstractFloat}
     gradTape = GradientTape(qaoa)
     function g!(G,x)
         gradient!(G, qaoa, gradTape, x)
@@ -233,4 +233,40 @@ function findMinimaAdam(qaoa::QAOA{P, H, M}, Γ0::Vector{T}, niter::Int=5000) wh
     opt_param = Optim.minimizer(result)
     toFundamentalRegion!(qaoa, opt_param)
     return opt_param, Optim.minimum(result)
+end
+
+function optimizeIPNewton(qaoa::QAOA{P, H, M}, 
+    Γ0::Vector{T}, 
+    bounds::Tuple{V, V}
+    ) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:AbstractFloat, V<:Vector}
+    
+    gradTape = GradientTape(qaoa)
+    function g!(G,x)
+        gradient!(G, qaoa, gradTape, x)
+    end
+    function h!(H, x)
+        H .= hessianCostFunction(qaoa, x, diffMode=:manual)
+    end
+    toFundamentalRegion!(qaoa, Γ0)
+    dF = Optim.TwiceDifferentiable(qaoa, g!, h!, Γ0)
+    low_params = bounds[1]
+    upper_params = bounds[2]
+    dfc = TwiceDifferentiableConstraints(low_params, upper_params)
+    res = optimize(dF, dfc, Γ0, IPNewton())
+    return Optim.minimizer(res), Optim.minimum(res) 
+end
+
+function optimizeFminbox(qaoa::QAOA{P, H, M}, Γ0::Vector{T}, bounds::Tuple{V, V}, niter::Int=1000
+    ) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:AbstractFloat, V<:Vector}
+    gradTape = GradientTape(qaoa)
+    function g!(G,x)
+        gradient!(G, qaoa, gradTape, x)
+    end
+    inner_optimizer = Optim.BFGS(linesearch=Optim.BackTracking(order=3))
+
+    low_params = bounds[1]
+    upper_params = bounds[2]
+    # @info res.f_converged
+    res = optimize(qaoa, g!, low_params, upper_params, Γ0, Fminbox(inner_optimizer))
+    return Optim.minimizer(res), Optim.minimum(res) 
 end

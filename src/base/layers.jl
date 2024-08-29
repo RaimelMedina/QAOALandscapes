@@ -17,7 +17,7 @@ function applyExpX!(psi::Vector{T}, k::Int, cos_a::R, sin_a::R) where {T, R}
     return nothing
 end
 
-function applyExpLayer!(mixer::XMixer, psi::AbstractVector{T}, β::R) where {T, R}
+function applyExpLayer!(mixer::XMixer, psi::Vector{T}, β::R) where {T, R}
     cβ = cos(β)
     sβ = sin(β)
     
@@ -36,14 +36,14 @@ function applyExpLayer!(mixer::XMixer, psi::AbstractVector{T}, β::R) where {T, 
     return nothing
 end
 
-function applyExpLayer!(hc::Vector{T}, ψ::AbstractVector{K}, γ::R) where {T, K, R}
-    @simd for i in eachindex(hc)
+function applyExpLayer!(hc::Vector{T}, ψ::Vector{K}, γ::R) where {T, K, R}
+    for i in eachindex(hc)
         ψ[i] *= exp(-im * γ * hc[i])
     end
     return nothing
 end
 
-function applyQAOALayer!(q::QAOA{P, H, M}, elem::T, index::Int, ψ0::AbstractVector{R}) where {P, H, M, T, R}
+function applyQAOALayer!(q::QAOA{P, H, M}, elem::T, index::Int, ψ0::Vector{R}) where {P, H, M, T, R}
     if isodd(index)
         applyExpLayer!(q.HC, ψ0, elem)
     else
@@ -52,7 +52,7 @@ function applyQAOALayer!(q::QAOA{P, H, M}, elem::T, index::Int, ψ0::AbstractVec
     return nothing
 end
 
-function applyQAOALayerDerivative!(qaoa::QAOA{P, H, M}, elem::T, pos::Int, state::AbstractVector{R}) where {P, H, M, T, R}
+function applyQAOALayerDerivative!(qaoa::QAOA{P, H, M}, elem::T, pos::Int, state::Vector{R}) where {P, H, M, T, R}
     applyQAOALayer!(qaoa, elem, pos, state)
     if isodd(pos)
         Hc_ψ!(qaoa.HC, state)
@@ -65,7 +65,7 @@ function applyQAOALayerDerivative!(qaoa::QAOA{P, H, M}, elem::T, pos::Int, state
     return nothing
 end
 
-function applyQAOALayerDerivative!(qaoa::QAOA{P, H, M}, elem::T, pos::Int, state::AbstractVector{R}, result::AbstractVector{R}) where {P, H, M, T, R}
+function applyQAOALayerDerivative!(qaoa::QAOA{P, H, M}, elem::T, pos::Int, state::Vector{R}, result::Vector{R}) where {P, H, M, T, R}
     applyQAOALayer!(qaoa, elem, pos, state)
     if isodd(pos)
         Hc_ψ!(qaoa.HC, state)

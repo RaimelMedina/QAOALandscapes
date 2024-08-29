@@ -89,7 +89,7 @@ and ``H_B, H_C`` corresponding to the mixing and cost Hamiltonian respectively.
 """
 
 function getQAOAState(q::QAOA{P, H, M}, Γ::AbstractVector{T}) where {P, H, M, T}
-    ψ::H = copy(q.initial_state)
+    ψ::AbstractVector{Complex{T}} = copy(q.initial_state) 
     for i in eachindex(Γ)
         applyQAOALayer!(q, Γ[i], i, ψ)
     end
@@ -111,7 +111,7 @@ with
 and ``H_B, H_C`` corresponding to the mixing and cost Hamiltonian respectively.
 """
 function getQAOAState(q::QAOA{P, H, M}, Γ::AbstractVector{T}, ψ0::H) where {P, H, M, T}
-    ψ::AbstractVector{Complex{T}} = copy(ψ0)
+    ψ = copy(ψ0)
     for i in eachindex(Γ)
         applyQAOALayer!(q, Γ[i], i, ψ)
     end

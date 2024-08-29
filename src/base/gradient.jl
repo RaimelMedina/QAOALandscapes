@@ -13,7 +13,7 @@ mutable struct GradientTape{T <: AbstractVector}
     end
 end
 
-function gradient!(G::Vector{T}, qaoa::QAOA{P, H, M}, gradTape::GradientTape{H}, params::Vector{T}) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
+function gradient!(G::Vector{T}, qaoa::QAOA{P, H, M}, gradTape::GradientTape{H}, params::Vector{T}) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T}
     # this will update/populate qaoa.state which we will call |λ⟩ following the paper
     gradTape.λ = getQAOAState(qaoa, params)
     # |ϕ⟩ := |λ⟩
@@ -53,7 +53,7 @@ end
 Compute the gradient of the QAOA cost function using adjoint (a reverse-mode) differentiation. We implement the algorithm 
 proposed in [*this reference*](https://arxiv.org/abs/2009.02823). https://arxiv.org/pdf/2011.02991.pdf
 """
-function gradCostFunction(qaoa::QAOA{P, H, M}, params::Vector{T}) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
+function gradCostFunction(qaoa::QAOA{P, H, M}, params::AbstractVector{T}) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T}
     # this will update/populate qaoa.state which we will call |λ⟩ following the paper
     λ = getQAOAState(qaoa, params) # U(Γ) |+⟩
     κ = copy(λ)
@@ -185,7 +185,8 @@ The computation is done analytically since it has proven to be faster than the p
 """
 function hessianCostFunction(qaoa::QAOA{P, H, M}, Γ::Vector{T}; diffMode=:mixed) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
     if diffMode==:mixed
-        return ForwardDiff.jacobian(x->gradCostFunction(qaoa, x), Γ)
+        g(x) = gradCostFunction(qaoa, x)
+        return ForwardDiff.jacobian(g, Γ)
     elseif diffMode==:manual
         p = length(Γ) ÷ 2
         

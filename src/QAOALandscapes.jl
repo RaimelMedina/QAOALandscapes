@@ -44,6 +44,7 @@ using CUDA
 using SparseArrays
 using Graphs
 using ForwardDiff
+using Enzyme
 using Random
 using ProgressMeter
 using SimpleWeightedGraphs

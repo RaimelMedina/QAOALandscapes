@@ -262,15 +262,15 @@ function ∂ψ(qaoa::QAOA{P, H, M}, Γ::Vector{T}, i::Int, j::Int) where {P<:Abs
     return ψ
 end
 
-# function hessianCostFunction(qaoa::QAOA{P, H, M}, Γ::Vector{T}, idx::Vector{Int}) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
-#     ψ = getQAOAState(qaoa, Γ)
-#     ψRow    = ∂ψ(qaoa, Γ, idx[1])
-#     ψCol    = ∂ψ(qaoa, Γ, idx[2])
-#     ψRowCol = ∂ψ(qaoa, Γ, idx[1], idx[2])
+function hessianCostFunction(qaoa::QAOA{P, H, M}, Γ::Vector{T}, idx::Vector{Int}) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
+    ψ = getQAOAState(qaoa, Γ)
+    ψRow    = ∂ψ(qaoa, Γ, idx[1])
+    ψCol    = ∂ψ(qaoa, Γ, idx[2])
+    ψRowCol = ∂ψ(qaoa, Γ, idx[1], idx[2])
 
-#     hessianElement = 2*real(dot(ψRow, qaoa.HC .* ψCol)) + 2*real(dot(ψ, qaoa.HC .* ψRowCol)) |> T
-#     return hessianElement
-# end
+    hessianElement = 2*real(dot(ψRow, qaoa.HC .* ψCol)) + 2*real(dot(ψ, qaoa.HC .* ψRowCol)) |> T
+    return hessianElement
+end
 
 
 """

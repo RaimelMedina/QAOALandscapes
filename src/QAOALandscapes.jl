@@ -16,7 +16,7 @@ export toFourierParams, fromFourierParams, fourierInitialization, fourierJacobia
 export transitionState, permuteHessian, getNegativeHessianEigval, getNegativeHessianEigvec, rollDownfromTS, rollDownTS, greedyOptimize, greedySelect, getHessianIndex
 # General stationary points
 export getStationaryPoints, gradSquaredNorm, optimizeGradSquaredNorm, gad
-
+export modulatedNewton, warmOptimizeModulatedNewton
 export QAOAData
 export Node, IdNodes, constructOptimizationGraph
 export TaylorTermsTS, Oϵ_ψ0, ψT2, ψT4, ψHC2
@@ -44,7 +44,6 @@ using CUDA
 using SparseArrays
 using Graphs
 using ForwardDiff
-using Enzyme
 using Random
 using ProgressMeter
 using SimpleWeightedGraphs

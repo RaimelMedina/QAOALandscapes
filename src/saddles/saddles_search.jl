@@ -166,18 +166,54 @@ function gad(qaoa::QAOA, init_point::Vector{T}; niter = 500, η=0.01, tol=1e-5) 
 end
 
 
-function modulatedNewton(qaoa::QAOA{P, H, M}, Γ0::Vector{T}, niter::Int=400) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:AbstractFloat}
-    g!(G, x) = G .= gradCostFunction(qaoa, x)
-    h!(H, x) = H .= hessianCostFunction(qaoa, x)
+function modulatedNewton(
+    qaoa::QAOA{P, H, M}, 
+    Γ0::Vector{T},
+    niter::Int=1_000
+    ) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:AbstractFloat}
+    
+    Γ = similar(Γ0)
+    Γ .= Γ0 
+    dim = length(Γ)
 
-    results = Optim.optimize(qaoa, g!, h!, Γ0, method=Optim.Newton(), iterations=niter)
-    parameters = Optim.minimizer(results)
-    energies = Optim.minimum(results)
-    toFundamentalRegion!(qaoa, parameters)
-    return parameters, energies
+    gradTape = QAOALandscapes.GradientTape(qaoa)
+    function g!(G,x)
+        QAOALandscapes.gradient!(G, qaoa, gradTape, x)
+    end
+    f(x) = qaoa(x)
+    ϵ = cbrt(eps(Float64))
+
+    # allocate matrix h for storing the hessian, and vector g for storing the gradient
+    h = zeros(T, dim, dim)
+    g = zeros(T, dim)
+
+    # to store the eigen-decomposition of the hessian
+    vals = zeros(T, dim)
+    vecs = zeros(T, dim, dim)
+    
+    @inbounds for i ∈ 1:niter
+        g!(g, Γ)
+        h .= hessianCostFunction(qaoa, Γ)
+
+        vals, vecs = eigen(hermitianpart(h))
+        vals .= abs.(vals)
+
+        # to avoid NaNs of Infs!
+        vals[vals .< ϵ] .+= ϵ
+
+        # aiming for index-1 saddle
+
+        h .= vecs * ((1 ./ vals) .* vecs')
+        Γ .= Γ - h * g
+
+        if norm(g) < 1e-5
+            return Γ, qaoa(Γ), i
+        end
+    end 
+    return Γ, qaoa(Γ), niter
 end
 
-function modulatedNewtonSaddles(qaoa::QAOA{P, H, M}, Γ0::Vector{T}, niter::Int=400) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:AbstractFloat}
+function modulatedNewtonSaddles(qaoa::QAOA{P, H, M}, Γ0::Vector{T}, niter::Int=1_000) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:AbstractFloat}
     # copy initial parameter
     Γ = similar(Γ0)
     Γ .= Γ0 
@@ -216,7 +252,7 @@ function modulatedNewtonSaddles(qaoa::QAOA{P, H, M}, Γ0::Vector{T}, niter::Int=
         #push!(energies, qaoa(Γ))
         #push!(parameters, Γ)
         
-        if norm(g) < 1e-6
+        if norm(g) < 1e-5
             break
         end
     end 
@@ -245,9 +281,9 @@ function optimizeIPNewton(qaoa::QAOA{P, H, M},
         gradient!(G, qaoa, gradTape, x)
     end
     function h!(H, x)
-        H .= hessianCostFunction(qaoa, x, diffMode=:manual)
+        H .= hessianCostFunction(qaoa, x)
     end
-    toFundamentalRegion!(qaoa, Γ0)
+
     dF = Optim.TwiceDifferentiable(qaoa, g!, h!, Γ0)
     low_params = bounds[1]
     upper_params = bounds[2]
@@ -256,8 +292,12 @@ function optimizeIPNewton(qaoa::QAOA{P, H, M},
     return Optim.minimizer(res), Optim.minimum(res) 
 end
 
-function optimizeFminbox(qaoa::QAOA{P, H, M}, Γ0::Vector{T}, bounds::Tuple{V, V}, niter::Int=1000
+function optimizeFminbox(
+    qaoa::QAOA{P, H, M}, 
+    Γ0::Vector{T}, 
+    bounds::Tuple{V, V}
     ) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:AbstractFloat, V<:Vector}
+    
     gradTape = GradientTape(qaoa)
     function g!(G,x)
         gradient!(G, qaoa, gradTape, x)
@@ -266,7 +306,20 @@ function optimizeFminbox(qaoa::QAOA{P, H, M}, Γ0::Vector{T}, bounds::Tuple{V, V
 
     low_params = bounds[1]
     upper_params = bounds[2]
-    # @info res.f_converged
+
     res = optimize(qaoa, g!, low_params, upper_params, Γ0, Fminbox(inner_optimizer))
-    return Optim.minimizer(res), Optim.minimum(res) 
+    return Optim.minimizer(res), Optim.minimum(res), Optim.iterations(res)
+end
+
+function warmOptimizeModulatedNewton(fun, extrem, vector_of_Γs::Matrix{T}) where {T}
+    npoints = size(vector_of_Γs, 2)
+    vector_of_params = similar(vector_of_Γs)
+    vector_of_energs = zeros(npoints)
+    number_of_iters = zeros(Int, npoints)
+    prog = Progress(npoints)
+    Threads.@threads for x ∈ axes(vector_of_Γs, 2)
+        (vector_of_params[:, x], vector_of_energs[x], number_of_iters[x]) = modulatedNewton(fun, vector_of_Γs[:, x])
+        next!(prog)
+    end
+    return SummaryDataOptimization(vector_of_energs, extrem, vector_of_params, number_of_iters)
 end

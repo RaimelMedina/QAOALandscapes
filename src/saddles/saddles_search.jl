@@ -311,7 +311,7 @@ function optimizeFminbox(
     return Optim.minimizer(res), Optim.minimum(res), Optim.iterations(res)
 end
 
-function warmOptimizeModulatedNewton(fun, extrem, vector_of_Γs::Matrix{T}) where {T}
+function warmOptimizeModulatedNewton(fun, vector_of_Γs::Matrix{T}) where {T}
     npoints = size(vector_of_Γs, 2)
     vector_of_params = similar(vector_of_Γs)
     vector_of_energs = zeros(npoints)
@@ -321,5 +321,18 @@ function warmOptimizeModulatedNewton(fun, extrem, vector_of_Γs::Matrix{T}) wher
         (vector_of_params[:, x], vector_of_energs[x], number_of_iters[x]) = modulatedNewton(fun, vector_of_Γs[:, x])
         next!(prog)
     end
-    return SummaryDataOptimization(vector_of_energs, extrem, vector_of_params, number_of_iters)
+    return vector_of_energs, vector_of_params, number_of_iters
+end
+
+function warmOptimizeFminbox(fun, vector_of_Γs::Matrix{T}, bounds::Tuple{V, V}) where {T, V<:Vector}
+    npoints = size(vector_of_Γs, 2)
+    vector_of_params = similar(vector_of_Γs)
+    vector_of_energs = zeros(npoints)
+    number_of_iters = zeros(Int, npoints)
+    prog = Progress(npoints)
+    Threads.@threads for x ∈ axes(vector_of_Γs, 2)
+        (vector_of_params[:, x], vector_of_energs[x], number_of_iters[x]) = optimizeFminbox(fun, vector_of_Γs[:, x], bounds)
+        next!(prog)
+    end
+    return vector_of_energs, vector_of_params, number_of_iters
 end

@@ -169,7 +169,8 @@ end
 function modulatedNewton(
     qaoa::QAOA{P, H, M}, 
     Γ0::Vector{T},
-    niter::Int=1_000
+    niter::Int=1_000; 
+    verbose=false
     ) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:AbstractFloat}
     
     Γ = similar(Γ0)
@@ -180,7 +181,53 @@ function modulatedNewton(
     function g!(G,x)
         QAOALandscapes.gradient!(G, qaoa, gradTape, x)
     end
-    f(x) = qaoa(x)
+    ϵ = cbrt(eps(Float64))
+
+    # allocate matrix h for storing the hessian, and vector g for storing the gradient
+    h = zeros(T, dim, dim)
+    g = zeros(T, dim)
+
+    # to store the eigen-decomposition of the hessian
+    vals = zeros(T, dim)
+    vecs = zeros(T, dim, dim)
+    
+    @inbounds for i ∈ 1:niter
+        g!(g, Γ)
+        h .= hessianCostFunction(qaoa, Γ)
+
+        vals, vecs = eigen(hermitianpart(h))
+        vals .= abs.(vals)
+
+        # to avoid NaNs of Infs!
+        vals[vals .< ϵ] .+= ϵ
+
+        h .= vecs * ((1 ./ vals) .* vecs')
+        Γ .= Γ - h * g
+
+        if norm(g) < 1e-5
+            verbose && println("Converged after $(i) iterations")
+            return Γ, qaoa(Γ), i
+        end
+    end
+    verbose && println("Optimization stopped due to reaching the maximum number of $(niter) iterations")
+    return Γ, qaoa(Γ), niter
+end
+
+function modulatedNewtonSaddles(
+    qaoa::QAOA{P, H, M}, 
+    Γ0::Vector{T}, 
+    niter::Int=1_000;
+    verbose=false
+    ) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:AbstractFloat}
+
+    Γ = similar(Γ0)
+    Γ .= Γ0 
+    dim = length(Γ)
+
+    gradTape = QAOALandscapes.GradientTape(qaoa)
+    function g!(G,x)
+        QAOALandscapes.gradient!(G, qaoa, gradTape, x)
+    end
     ϵ = cbrt(eps(Float64))
 
     # allocate matrix h for storing the hessian, and vector g for storing the gradient
@@ -202,62 +249,18 @@ function modulatedNewton(
         vals[vals .< ϵ] .+= ϵ
 
         # aiming for index-1 saddle
+        vals[1] *= -1
 
         h .= vecs * ((1 ./ vals) .* vecs')
         Γ .= Γ - h * g
 
         if norm(g) < 1e-5
+            verbose && println("Converged after $(i) iterations")
             return Γ, qaoa(Γ), i
         end
-    end 
+    end
+    verbose && println("Optimization stopped due to reaching the maximum number of $(niter) iterations")
     return Γ, qaoa(Γ), niter
-end
-
-function modulatedNewtonSaddles(qaoa::QAOA{P, H, M}, Γ0::Vector{T}, niter::Int=1_000) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:AbstractFloat}
-    # copy initial parameter
-    Γ = similar(Γ0)
-    Γ .= Γ0 
-    # fold parameter to fundamental region
-    toFundamentalRegion!(qaoa, Γ)
-    dim = length(Γ)
-    
-    ϵ = cbrt(eps(Float64))
-
-    # allocate matrix h for storing the hessian, and vector g for storing the gradient
-    h = zeros(T, dim, dim)
-    g = zeros(T, dim)
-
-    # to store the eigen-decomposition of the hessian
-    vals = zeros(T, dim)
-    vecs = zeros(T, dim, dim)
-    
-    for _ ∈ 1:niter
-        g .= gradCostFunction(qaoa, Γ)
-        h .= hessianCostFunction(qaoa, Γ)
-        
-        vals, vecs = eigen(hermitianpart(h))
-        vals .= abs.(vals)
-
-        # to avoid NaNs of Infs!
-        vals[vals .< ϵ] .+= ϵ
-
-        # aiming for index-1 saddle
-        vals[1] *= -1
-
-        h .= vecs * Diagonal(1 ./ vals) * vecs'
-        Γ .= Γ - h * g
-
-        toFundamentalRegion!(qaoa, Γ)
-        
-        #push!(energies, qaoa(Γ))
-        #push!(parameters, Γ)
-        
-        if norm(g) < 1e-5
-            break
-        end
-    end 
-
-    return Γ, qaoa(Γ)
 end
 
 function findMinimaAdam(qaoa::QAOA{P, H, M}, Γ0::Vector{T}, niter::Int=300) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:AbstractFloat}

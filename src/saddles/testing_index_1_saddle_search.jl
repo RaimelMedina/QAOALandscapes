@@ -12,7 +12,7 @@ qaoa = QAOA(problem)
 
 # optimization graph #
 Γinit, Einit = getInitialParameter(qaoa)
-opt_graph = constructOptimizationGraph(qaoa, Γinit, 8);
+opt_graph = constructOptimizationGraph(qaoa, Γinit, 3);
 
 edges_opt_graph, energ_opt_graph, depths_opt_graph = QAOALandscapes.getEdgesFromOptGraph(qaoa, opt_graph)
 
@@ -33,25 +33,47 @@ function warmOptimizeNewtonSaddles(qaoa::QAOA, p::Int, npoints::Int; seed=123)
         push!(data_energ, temp[2])
     end
     
-    norm_points = map(x->norm(gradCostFunction(qaoa, x)), data_param)
-    converged_idx = findall(x->x<1e-5, norm_points)
+    # norm_points = map(x->norm(gradCostFunction(qaoa, x)), data_param)
+    # converged_idx = findall(x->x<1e-5, norm_points)
 
-    converged_energies = data_energ[converged_idx]
-    converged_params   = data_param[converged_idx]
+    # converged_energies = data_energ[converged_idx]
+    # converged_params   = data_param[converged_idx]
 
-    rounded_energies = round.(converged_energies, digits=6)
-    idx = unique(i->rounded_energies[i], eachindex(rounded_energies))
+    # rounded_energies = round.(converged_energies, digits=6)
+    # idx = unique(i->rounded_energies[i], eachindex(rounded_energies))
 
-    println("$(length(idx)) unique converged points out of $(npoints) initial particles")
+    # println("$(length(idx)) unique converged points out of $(npoints) initial particles")
 
 
-    return converged_params[idx], converged_energies[idx]
+    # return converged_params[idx], converged_energies[idx]
+    return data_energ, data_param
 end
 
 
-params_p_2, energs_p_2 = warmOptimizeNewtonSaddles(qaoa, 2, 1000);
-params_p_3, energs_p_3 = warmOptimizeNewtonSaddles(qaoa, 3, 1000; seed=456);
+energs_p_2, params_p_2 = warmOptimizeNewtonSaddles(qaoa, 2, 1000);
+params_p_3, energs_p_3 = warmOptimizeNewtonSaddles(qaoa, 3, 1000);
 params_p_4, energs_p_4 = warmOptimizeNewtonSaddles(qaoa, 4, 1000);
+
+p=2
+Ts = Float64
+γ1 = (0. |> Ts , π/4 |> Ts)
+γ = (-π/4 |> Ts, π/4 |> Ts)
+
+using QAOAHomology
+grid_specif = GridSpecifications(p, 70, γ1, γ);
+pgrid = parameter_grid(grid_specif);
+tolerance = 1e-6
+tci, ranks, errors = tci_energy_grid(qaoa, pgrid, 10; tolerance=tolerance, verbosity=3)
+
+@time homology_data = Homology0Data(p, 0., tci, pgrid, filtration_type=:Rips);
+
+using Ripserer
+sort(homology_data.h0, by=death)
+
+
+pp=Plots.plot(homology_data.h0, homology_data.merges, homology_data.grid_extrema[2],
+    ylims = (:auto, -4.)
+)
 
 
 

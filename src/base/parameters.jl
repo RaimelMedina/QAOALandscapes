@@ -60,6 +60,11 @@ function toFundamentalRegion!(qaoa::QAOA{P, H, M, C},
                 @show "entering here" # now folding them even more: to -pi/4, pi/4 interval
                 β[i:end] .*= -1 # this requires sign flip of betas!
                 γ[i] -= sign(γ[i])*π/2 |> T
+                for j in 1:p
+                    if β[j] == π/4
+                       β[j] *= -1
+                    end
+                end 
             end
         end
     end

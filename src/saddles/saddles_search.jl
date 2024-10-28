@@ -206,10 +206,12 @@ function modulatedNewton(
 
         if norm(g) < 1e-5
             verbose && println("Converged after $(i) iterations")
+            toFundamentalRegion!(qaoa, Γ)
             return Γ, qaoa(Γ), i
         end
     end
     verbose && println("Optimization stopped due to reaching the maximum number of $(niter) iterations")
+    toFundamentalRegion!(qaoa, Γ)
     return Γ, qaoa(Γ), niter
 end
 
@@ -256,10 +258,12 @@ function modulatedNewtonSaddles(
 
         if norm(g) < 1e-5
             verbose && println("Converged after $(i) iterations")
+            toFundamentalRegion!(qaoa, Γ)
             return Γ, qaoa(Γ), i
         end
     end
     verbose && println("Optimization stopped due to reaching the maximum number of $(niter) iterations")
+    toFundamentalRegion!(qaoa, Γ)
     return Γ, qaoa(Γ), niter
 end
 

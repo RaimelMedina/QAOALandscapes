@@ -29,9 +29,12 @@ export labs_hamiltonian
 
 export xorsat_dict
 
-
+abstract type AbstractQAOACost end
+abstract type QuantumCost <: AbstractQAOACost end
+abstract type ClassicalCost <: AbstractQAOACost end
 abstract type AbstractProblem end
 abstract type AbstractMixer end
+
 
 # using Requires
 # function __init__()
@@ -72,14 +75,14 @@ include(joinpath("base", "gradient.jl"))
 include(joinpath("base", "layers.jl"))
 include(joinpath("base", "optimization_settings.jl"))
 include(joinpath("base", "parameters.jl"))
-include(joinpath("base", "gpu.jl"))
+# include(joinpath("base", "gpu.jl"))
 
 
 # inside /classical
 include(joinpath("classical", "maxcut.jl"))
 
 # inside /experimental
-include(joinpath("experimental", "data_wrapper.jl"))
+# include(joinpath("experimental", "data_wrapper.jl"))
 include(joinpath("experimental", "experimental.jl"))
 
 # inside /initializations
@@ -93,8 +96,8 @@ include(joinpath("initializations", "hessian_tools.jl"))
 include(joinpath("saddles", "saddles_search.jl"))
 
 # inside /utilities
-include(joinpath("utilities", "utils.jl"))
-include(joinpath("utilities", "state_utilities.jl"))
+# include(joinpath("utilities", "utils.jl"))
+# include(joinpath("utilities", "state_utilities.jl"))
 include("test_instances.jl")
 
 end

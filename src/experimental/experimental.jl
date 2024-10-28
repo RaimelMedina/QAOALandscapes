@@ -180,18 +180,34 @@ function constructOptimizationGraph(qaoa::QAOA, Γ0::Vector{T}, pmax::Int; digit
 
 end
 
-function getEdgesFromOptGraph(qaoa::QAOA, vec::Vector{Dict})
-    energy_data = Pair{Int, Float64}[]
+function getEdgesFromOptGraph(qaoa::QAOA, vec::Vector{Dict}; construct_graph=false)
+    energy_data = Dict{Int, Float64}()
     edges_data  = Tuple{Int, Int}[]
     circ_depth  = Int[]
     for i ∈ eachindex(vec)
         for (k,v) in vec[i]
             push!(circ_depth, i)
-            push!(energy_data, Pair(v.id, qaoa(k)))
+            energy_data[v.id + 1] = qaoa(k)
             for uId in unique(v.parentId)
-                push!(edges_data, (v.id, uId))
+                if v.id != uId
+                    if v.id < uId
+                        push!(edges_data, (v.id + 1, uId + 1))
+                    else
+                        push!(edges_data, (uId + 1, v.id + 1))
+                    end
+                end
             end
         end
     end
-    return edges_data, energy_data, circ_depth
+    if construct_graph
+        g = SimpleDiGraph(Edge{Int}.(edges_data))
+        # for eg in edges_data
+        #     if eg[1] != eg[2]
+        #         add_edge!(g, eg[1], eg[2])
+        #     end
+        # end
+        return g, edges_data, energy_data, circ_depth
+    else
+        return g, edges_data, energy_data
+    end
 end

@@ -30,9 +30,9 @@ can be restricted even further to the ``[-\pi/4, \pi/4]`` interval (see [`here`]
 Finally, when dealing with regular graphs with odd degree `\gamma` paramaters can be brought to the ``[-\pi/4, \pi/4]`` interval.
 This function modifies inplace the initial input vector ``Γ``. 
 """
-function toFundamentalRegion!(qaoa::QAOA{P, H, M}, 
+function toFundamentalRegion!(qaoa::QAOA{P, H, M, C}, 
     Γ::AbstractVector{T}
-    ) where {P, H, M, T<:Real}
+    ) where {P, H, M, T<:Real, C}
     
     p = length(Γ) ÷ 2
     β = view(Γ, 2:2:2p)
@@ -52,7 +52,7 @@ function toFundamentalRegion!(qaoa::QAOA{P, H, M},
     end
     if isZ2invariant
         β .= mod.(β, π/2) .|> T
-        β[β .> π/4] .-= T(π/2)
+        β[β .> π/4] .-= T(π/2)  
     end
     if !isnothing(problem_degree) && reduce(*, isodd.(problem_degree)) && !isWeightedG
         for i=1:p
@@ -62,9 +62,9 @@ function toFundamentalRegion!(qaoa::QAOA{P, H, M},
             end
         end
     end
-    if γ[1] < 0 # making angle gamma_1 positive
-        β .*= -1 # by changing the sign of ALL angles
-        γ .*= -1
-    end
+    # if γ[1] < 0 # making angle gamma_1 positive
+    #     β .*= -1 # by changing the sign of ALL angles
+    #     γ .*= -1
+    # end
     return nothing
 end

@@ -48,11 +48,11 @@ Optimizes the QAOA parameters using the specified optimization method and linese
 result = optimizeParameters(qaoa, params, method=Optim.BFGS(linesearch=Optim.HagerZhang()), printout=true)
 ```
 """
-function optimizeParameters(qaoa::QAOA{P, H, M}, 
+function optimizeParameters(qaoa::QAOA{P, H, M, C}, 
     params::Vector{T};
     setup = OptSetup(),
     fun_calls=false
-    ) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
+    ) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real, C}
     
     type_optim = typeof(setup.method)
     if type_optim <: Optim.FirstOrderOptimizer
@@ -117,11 +117,11 @@ It returns a tuple containing the following information
 * `cost::Float64`: Value of the cost function for the optimal parameter obtained.
 """
 function optimizeParameters(::Val{:Fourier}, 
-    qaoa::QAOA{P, H, M}, 
+    qaoa::QAOA{P, H, M, C}, 
     params::AbstractVector{T},
     p::Int=length(params)÷2;
     setup = OptSetup()
-    ) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
+    ) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real, C}
     
     q = length(params) ÷ 2
     
@@ -180,12 +180,12 @@ Optimize the parameters of the QAOA along the index-1 direction of the transitio
 - `x_vals::Vector{Vector{T}}`: The corresponding parameter values that yield the minimum objective function values.
 
 """
-function optimizeParametersSlice(qaoa::QAOA{P, H, M}, 
+function optimizeParametersSlice(qaoa::QAOA{P, H, M, C}, 
     Γmin::Vector{T}, 
     ig::Integer,
     gsIndex::Vector{Int};
     tsType = "symmetric"
-    ) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
+    ) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real, C<:ClassicalCost}
     
     ΓTs = transitionState(Γmin, ig, tsType=tsType)
     u   = getNegativeHessianEigvec(qaoa, Γmin, ig, tsType=tsType)["eigvec_approx"] |> Array
@@ -217,6 +217,37 @@ function optimizeParametersSlice(qaoa::QAOA{P, H, M},
     return result
 end
 
+function optimizeParametersSlice(qaoa::QAOA{P, H, M, C}, 
+    Γmin::Vector{T}, 
+    ig::Integer,
+    tsType = "symmetric"
+    ) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real, C<:QuantumCost}
+    
+    ΓTs = transitionState(Γmin, ig, tsType=tsType)
+    u   = getNegativeHessianEigvec(qaoa, Γmin, ig, tsType=tsType)["eigvec_approx"] |> Array
+
+    energ(x) = qaoa(ΓTs + u*x[1])
+    # Set limits of search #
+    lower = T.([(-1)])
+    upper = T.([1])
+    
+    # Set initial parameters
+    x0_p = T.([0.01])
+    x0_m = T.([-0.01])
+    
+    # Set inner optimizer #
+    inner_optimizer = Optim.BFGS(linesearch=LineSearches.BackTracking(order=3))
+    
+    energ_res_m = optimize(energ, lower, upper, x0_m, Fminbox(inner_optimizer), autodiff=:forward)
+    energ_res_p = optimize(energ, lower, upper, x0_p, Fminbox(inner_optimizer), autodiff=:forward)
+
+    # result = Dict(
+    #     "energy" => (val = [Optim.minimum(energ_res_m), Optim.minimum(energ_res_p)], x_opt = vcat([Optim.minimizer(energ_res_m), Optim.minimizer(energ_res_p)]...)),
+    # )
+    
+    # return result
+    return energ_res_m, energ_res_p
+end
 
 @doc raw"""
     getInitialParameter(qaoa::QAOA; spacing = 0.01, gradTol = 1e-6)
@@ -230,10 +261,10 @@ We then launch the `QAOA` optimization procedure from the point in the 2-dimensi
 # Returns
 * 3-Tuple containing: 1.) the cost function grid, 2.) the optimal parameter, and 3.) the optimal energy
 """
-function getInitialParameter(qaoa::QAOA{P, H, M}; 
+function getInitialParameter(qaoa::QAOA{P, H, M, C}; 
     setup=OptSetup(), 
     num_points=20, 
-    ) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer}
+    ) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, C}
     
     T = qaoa.problem |> eltype
     initial_points = rand(T, 2, num_points)*2π
@@ -246,7 +277,7 @@ function getInitialParameter(qaoa::QAOA{P, H, M};
     
     (Einit, index) = findmin(energies_points)
     Γ = Vector(params_points[:, index])
-    #toFundamentalRegion!(qaoa, Γ)
+    toFundamentalRegion!(qaoa, Γ)
 
     return Γ, Einit
 end

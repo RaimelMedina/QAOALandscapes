@@ -42,21 +42,22 @@ function toFundamentalRegion!(qaoa::QAOA{P, H, M, C},
     isWeightedG    = qaoa.problem.weightedQ
     isZ2invariant  = qaoa.problem.z2_sym
 
-    # When HB-> XMixer then we know that βₗ ∈ [-π/2, π/2]
-    # If HC is not weighted then we can also restrict γₗ ∈ [-π/2, π/2]
+    # When HB-> XMixer then we know that βₗ ∈ [-π/2, π/2)
+    # If HC is not weighted then we can also restrict γₗ ∈ [-π/2, π/2)
     β .= mod.(β, π) .|> T
-    β[β .> π/2] .-= T(π)
+    β[β .>= π/2] .-= T(π)
     if !isWeightedG
         γ .= mod.(γ, π) .|> T
-        γ[γ .> π/2] .-= T(π)
+        γ[γ .>= π/2] .-= T(π)
     end
     if isZ2invariant
         β .= mod.(β, π/2) .|> T
-        β[β .> π/4] .-= T(π/2)  
+        β[β .>= π/4] .-= T(π/2)  
     end
     if !isnothing(problem_degree) && reduce(*, isodd.(problem_degree)) && !isWeightedG
         for i=1:p
-            if abs(γ[i]) > π/4 # now folding them even more: to -pi/4, pi/4 interval
+            if γ[i] < -π/4 || γ[i] ≥ π/4 
+                @show "entering here" # now folding them even more: to -pi/4, pi/4 interval
                 β[i:end] .*= -1 # this requires sign flip of betas!
                 γ[i] -= sign(γ[i])*π/2 |> T
             end

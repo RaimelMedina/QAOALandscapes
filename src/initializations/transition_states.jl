@@ -77,13 +77,13 @@ that the obtained vectors have lower energy than the initial vector `Γmin`
 # Return
 * `result:Tuple`. The returned paramaters are as follows => `Γmin_m, Γmin_p, Emin_m, Emin_p, info_m, info_p`
 """
-function rollDownfromTS(qaoa::QAOA{P, H, M, C}, 
+function rollDownfromTS(qaoa::QAOA{C, S, P, H, M}, 
     Γmin::Vector{T}, 
     ig::Int; 
     ϵ=T(0.001), 
     tsType="symmetric", 
     setup=OptSetup()
-    ) where {P, H, M, T<:Real, C}
+    ) where {C<:AbstractQAOACost, S<:ExpectationMethod, P, H, M, T<:Real}
 
     ΓTs = transitionState(Γmin, ig, tsType=tsType)
     umin = getNegativeHessianEigvec(qaoa, Γmin, ig, tsType=tsType)["eigvec_approx"] |> Array
@@ -119,13 +119,13 @@ that the obtained vectors have lower energy than the initial vector `Γmin`
 # Return
 * `result:Tuple`. The returned paramaters are as follows => `Γmin_m, Γmin_p, Emin_m, Emin_p, info_m, info_p`
 """
-function rollDownTS(qaoa::QAOA{P, H, M, C}, Γmin::Vector{T}; 
+function rollDownTS(qaoa::QAOA{C, S, P, H, M}, Γmin::Vector{T}; 
     setup=OptSetup(),
     ϵ=T(0.001), 
     threaded=false
-    ) where {P, H, M, T<:Real, C}
+    ) where {C<:AbstractQAOACost, S<:ExpectationMethod, P, H, M, T<:Real}
 
-    p                = length(Γmin) ÷ 2
+    p = length(Γmin) ÷ 2
     parametersResult = Dict{String, Vector{Vector{T}}}()  
     energiesResult   = Dict{String, Vector{T}}()
     dictTS  = Dict{String, Vector{Vector{T}}}()

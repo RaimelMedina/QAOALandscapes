@@ -1,7 +1,7 @@
 struct ClassicalProblem{T<:Real} <: AbstractProblem
     interactions::Dict{Vector{Int}, T}
     n::Int
-    z2_sym::Bool
+    locality::Vector{Int}
     degree::Union{Int, Nothing}
     weightedQ::Bool
 end
@@ -9,23 +9,19 @@ end
 Base.eltype(cp::ClassicalProblem{R}) where R<:Real = R
 nqubits(cp::ClassicalProblem)::Int = cp.n
 Base.length(cp::ClassicalProblem) = length(cp.interactions)
-locality(cp::ClassicalProblem) = maximum(map(length, keys(cp.interactions)))
+locality(cp::ClassicalProblem) = cp.locality
 
-function z2SymmetricQ(cp::ClassicalProblem{T}) where T<:Real
-    return cp.z2_sym
-end
-
-function z2SymmetricQ(dict::Dict{Vector{Int}, T}) where T<:Real
-    locality_of_hs = foldl(*, map(iseven ∘ length, keys(dict) |> collect))
+function locality(dict::Dict{Vector{Int}, T}) where T<:Real
+    locality_of_hs = unique(map(length, keys(dict) |> collect))
     return locality_of_hs
 end
 
-function z2SymmetricQ(pair::Pair{Vector{Int}, T}) where T<:Real
-    return pair.first |> length |> iseven
+function locality(pair::Pair{Vector{Int}, T}) where T<:Real
+    return pair.first |> length
 end
 
-function z2SymmetricQ(pairs::Vector{Pair{Vector{Int}, T}}) where T<:Real
-    return foldl(*, map(z2SymmetricQ, pairs))
+function locality(pairs::Vector{Pair{Vector{Int}, T}}) where T<:Real
+    return map(locality, pairs) |> unique
 end
 
 function regularQ(cp::ClassicalProblem{R}) where R <: Real
@@ -68,50 +64,78 @@ function regularQ(interactions::Dict, n::Int; adjmat_return=false)
 end
 
 function Base.show(io::IO, cp::ClassicalProblem{T}) where T<:Real
-    if cp.z2_sym
-        str = "Z₂ symmetric classical problem on $(cp.n) qubits with interactions terms:"
+    println(io, "Classical problem on $(cp.n) qubits")
+    klocal = unique(cp.locality) |> sort
+    if length(klocal)==1
+        println(io, "With interaction terms of locality k=$(klocal[1])")
     else
-        str = "Classical problem on $(cp.n) qubits with interactions terms:"
+        println(io, "With interaction terms of locality k=$(klocal)")
     end
-    println(io, str)
     for k ∈ keys(cp.interactions)
         println(io, "├─ $(k) => $(cp.interactions[k])")
     end
+    
 end
 
 function ClassicalProblem(T::Type{<:Real}, g::SimpleGraph{<:Int})
     terms = Dict{Vector{Int}, T}([e.src, e.dst] => T(1) for e in edges(g))
     vertex_degree = degree(g)
-    dg = allequal(vertex_degree) ? vertex_degree[1] : nothing 
-    return ClassicalProblem{T}(terms, nv(g), true, dg, false)
+    dg = allequal(vertex_degree) ? vertex_degree[1] : nothing
+    locality_of_terms = [2]
+    return ClassicalProblem{T}(
+        terms, 
+        nv(g), 
+        locality_of_terms, 
+        dg, 
+        false
+    )
 end
 
 function ClassicalProblem(g::SimpleWeightedGraph{<:Int, T}) where T<:Real
     terms = Dict{Vector{Int}, T}([e.src, e.dst] => weight(e) for e in edges(g)) 
     vertex_degree = degree(g)
-    dg = allequal(vertex_degree) ? vertex_degree[1] : nothing 
-    return ClassicalProblem{T}(terms, nv(g), true, dg, true)
+    dg = allequal(vertex_degree) ? vertex_degree[1] : nothing
+    locality_of_terms = [2]
+    return ClassicalProblem{T}(
+        terms, 
+        nv(g), 
+        locality_of_terms, 
+        dg, 
+        true
+    )
 end
 
 function ClassicalProblem(terms::Dict{Vector{Int}, T}, n::Int) where T<:Real
-    return ClassicalProblem{T}(terms, n, 
-    z2SymmetricQ(terms), 
-    regularQ(terms, n), 
-    !allequal(values(terms))
+    isWeigted = !all(abs.(values(terms)) .== T(1))
+    return ClassicalProblem{T}(
+        terms, 
+        n, 
+        locality(terms), 
+        regularQ(terms, n), 
+        isWeigted
     )
 end
 
 function ClassicalProblem(interaction::Pair{Vector{Int}, T}, n::Int) where T<:Real
     terms = Dict(interaction)
-    return ClassicalProblem{T}(terms, n, z2SymmetricQ(interaction), nothing, true)
+    isWeighted = !(abs(interaction.second) == 1)
+    return ClassicalProblem{T}(
+        terms, 
+        n, 
+        locality(interaction), 
+        nothing, 
+        isWeighted
+    )
 end
 
 function ClassicalProblem(interactions::Vector{Pair{Vector{Int}, T}}, n::Int) where T<:Real
     terms = Dict(interactions)
-    return ClassicalProblem{T}(terms, n, 
-    z2SymmetricQ(interactions), 
-    regularQ(terms, n), 
-    allequal(values(terms))
+    return ClassicalProblem{T}(
+        terms, 
+        n, 
+        locality(interactions), 
+        regularQ(terms, n), 
+        !foldl(&, abs.(values(terms)) .== 1)
     )
 end
 
@@ -128,44 +152,53 @@ function ClassicalProblem(T::Type{<:Real}, mat::BitMatrix, J::Vector{Int})
     zsum = sum(mat, dims=2)
 
     degree = allequal(rsum) ? rsum[1] : nothing
-    z2     = prod(iseven.(zsum))
-    weight = allequal(J)
+    locality_of_terms = unique(zsum)
+    all_Js_equal = foldl(&, abs.(J) .== 1)
 
-    return ClassicalProblem{T}(interactions, N, z2, degree, !weight)
+    return ClassicalProblem{T}(interactions, N, locality_of_terms, degree, !all_Js_equal)
 end
 
 
 function hamiltonian(cp::ClassicalProblem{T}, sym_sector = true) where T
+    # Trying to avoid repeated allocations
+    element_buffer = Vector{Bool}(undef, maximum(length(term) for term in keys(cp.interactions)))
+    
+    # Define ham_density_element to use the pre-allocated buffer
     function ham_density_element(x::Int, term::Vector{Int})
-        elements = map(i->((x>>(i-1))&1), term)
-        idx      = foldl(⊻, elements)
-        val = Complex{T}(((-1)^idx)*cp.interactions[term])
-        return val
-    end
-
-    function ham_value(x::Int)
-        return sum(k->ham_density_element(x, k), keys(cp.interactions))
+        # Reuse buffer instead of allocating in map
+        for (idx, i) in enumerate(term)
+            element_buffer[idx] = ((x >> (i-1)) & 1) == 1
+        end
+        idx = false
+        @inbounds for i in 1:length(term)
+            idx ⊻= element_buffer[i]
+        end
+        return Complex{T}(((-1)^idx) * cp.interactions[term])
     end
     
-    if sym_sector
-        if z2SymmetricQ(cp)
-            ham = zeros(Complex{T}, 2^(cp.n-1))
-        else
-            @info "Problem is not symmetric"
-            ham = zeros(Complex{T}, 2^(cp.n))
-        end
+    z2_sym = foldl(&, iseven.(cp.locality))
+    dim = if sym_sector && z2_sym
+        2^(cp.n-1)
     else
-        ham = zeros(Complex{T}, 2^(cp.n))
+        sym_sector && !z2_sym && @info "Problem is not symmetric"
+        2^cp.n
     end
+    ham = zeros(Complex{T}, dim)
 
-    for i in eachindex(ham)
-        ham[i] = ham_value(i-1)
+    interaction_keys = collect(keys(cp.interactions))
+    
+    @inbounds for i in eachindex(ham)
+        val = zero(Complex{T})
+        for term in interaction_keys
+            val += ham_density_element(i-1, term)
+        end
+        ham[i] = val
     end
     return ham
 end
 
 function Hc_ψ!(ham::Vector{S}, ψ::Vector{T}) where {S, T}
-    for i in eachindex(ψ)
+    @inbounds for i in eachindex(ψ)
         ψ[i] *= ham[i]
     end
     return nothing

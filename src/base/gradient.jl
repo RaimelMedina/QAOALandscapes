@@ -4,7 +4,8 @@ mutable struct GradientTape{T <: AbstractVector}
     μ::T
     ξ::T
 
-    function GradientTape(qaoa::QAOA{P, H, M, C}) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, C<:AbstractQAOACost}
+    function GradientTape(qaoa::QAOA{C, ExactMethod, P, H, M}
+        ) where {C<:AbstractQAOACost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer}
         return new{H}(copy(qaoa.initial_state), 
             copy(qaoa.initial_state), 
             copy(qaoa.initial_state), 
@@ -13,7 +14,8 @@ mutable struct GradientTape{T <: AbstractVector}
     end
 end
 
-function gradient!(G::Vector{T}, qaoa::QAOA{P, H, M, C}, gradTape::GradientTape{H}, params::Vector{T}) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T, C<:ClassicalCost}
+function gradient!(G::Vector{T}, qaoa::QAOA{C, ExactMethod, P, H, M}, gradTape::GradientTape{H}, params::Vector{T}
+    ) where {C<:ClassicalCost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T}
     # this will update/populate qaoa.state which we will call |λ⟩ following the paper
     gradTape.λ = getQAOAState(qaoa, params)
     
@@ -49,7 +51,13 @@ function gradient!(G::Vector{T}, qaoa::QAOA{P, H, M, C}, gradTape::GradientTape{
     return nothing
 end
 
-function gradient!(G::Vector{T}, qaoa::QAOA{P, H, M, C}, gradTape::GradientTape{H}, params::Vector{T}) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T, C<:QuantumCost}
+function gradient!(
+    G::Vector{T}, 
+    qaoa::QAOA{C, ExactMethod, P, H, M}, 
+    gradTape::GradientTape{H}, 
+    params::Vector{T}
+    ) where {C<:QuantumCost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T, }
+    
     # this will update/populate qaoa.state which we will call |λ⟩ following the paper
     gradTape.λ = getQAOAState(qaoa, params)
     λ_hx = copy(gradTape.λ)
@@ -93,7 +101,8 @@ end
 Compute the gradient of the QAOA cost function using adjoint (a reverse-mode) differentiation. We implement the algorithm 
 proposed in [*this reference*](https://arxiv.org/abs/2009.02823). https://arxiv.org/pdf/2011.02991.pdf
 """
-function gradCostFunction(qaoa::QAOA{P, H, M, C}, params::AbstractVector{T}) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T, C<:ClassicalCost}
+function gradCostFunction(qaoa::QAOA{C, ExactMethod, P, H, M}, params::AbstractVector{T}
+    ) where {C<:ClassicalCost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T}
     # this will update/populate qaoa.state which we will call |λ⟩ following the paper
     λ = getQAOAState(qaoa, params) # U(Γ) |+⟩
     κ = copy(λ)
@@ -119,7 +128,7 @@ function gradCostFunction(qaoa::QAOA{P, H, M, C}, params::AbstractVector{T}) whe
         applyQAOALayerDerivative!(qaoa, params[i], i, μ, κ)
         
         # ∇Eᵢ = 2 ℜ ⟨ λ | μ ⟩
-        gradResult[i] = T(2)*real(dot(λ, μ))
+        gradResult[i] = 2*real(dot(λ, μ))
         if i > 1
             #|λ⟩ ← (Uᵢ)†|λ⟩
             applyQAOALayer!(qaoa, -params[i], i, λ)
@@ -128,7 +137,10 @@ function gradCostFunction(qaoa::QAOA{P, H, M, C}, params::AbstractVector{T}) whe
     return gradResult
 end
 
-function gradCostFunction(qaoa::QAOA{P, H, M, C}, params::AbstractVector{T}) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T, C<:QuantumCost}
+function gradCostFunction(
+    qaoa::QAOA{C, ExactMethod, P, H, M}, 
+    params::AbstractVector{T}
+    ) where {C<:QuantumCost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T}
     # this will update/populate qaoa.state which we will call |λ⟩ following the paper
     λ = getQAOAState(qaoa, params) # U(Γ) |+⟩
     λ_hx = copy(λ)
@@ -166,7 +178,11 @@ function gradCostFunction(qaoa::QAOA{P, H, M, C}, params::AbstractVector{T}) whe
     return gradResult
 end
 
-function gradCostFunction(qaoa::QAOA{P, H, M, C}, params::Vector{T}, Op!::Function) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real, C<:ClassicalCost}
+function gradCostFunction(
+    qaoa::QAOA{C, ExactMethod, P, H, M}, 
+    params::Vector{T}, 
+    Op!::Function
+    ) where {C<:ClassicalCost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
     # this will update/populate qaoa.state which we will call |λ⟩ following the paper
     λ = getQAOAState(qaoa, params) # U(Γ) |+⟩
     κ = copy(λ)
@@ -206,7 +222,11 @@ end
 Compute the geometricTensor of the QAOA cost function using adjoint (a reverse-mode) differentiation. We implement the algorithm 
 proposed in [*this reference*](https://arxiv.org/pdf/2011.02991.pdf)
 """
-function geometricTensor(qaoa::QAOA{P, H, M, C}, params::Vector{T}, ψ0::H) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real, C<:AbstractQAOACost}
+function geometricTensor(
+    qaoa::QAOA{C, ExactMethod, P, H, M}, 
+    params::Vector{T}, 
+    ψ0::H
+    ) where {C<:AbstractQAOACost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
     T_vec = zeros(Complex{T}, length(params))
     L_mat = zeros(Complex{T}, length(params), length(params))
     G_mat = zeros(Complex{T}, length(params), length(params))
@@ -261,7 +281,11 @@ end
 Computes the cost function Hessian at the point ``\Gamma`` in parameter space. 
 The computation is done analytically since it has proven to be faster than the previous implementation using [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl) package
 """
-function hessianCostFunction(qaoa::QAOA{P, H, M, C}, Γ::Vector{T}; diffMode=:mixed) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real, C<:AbstractQAOACost}
+function hessianCostFunction(
+    qaoa::QAOA{C, ExactMethod, P, H, M}, 
+    Γ::Vector{T}; 
+    diffMode=:mixed
+    ) where {C<:AbstractQAOACost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
     if diffMode==:mixed
         g(x) = gradCostFunction(qaoa, x)
         return ForwardDiff.jacobian(g, Γ)
@@ -293,7 +317,11 @@ function hessianCostFunction(qaoa::QAOA{P, H, M, C}, Γ::Vector{T}; diffMode=:mi
     end
 end
 
-function ∂ψ(qaoa::QAOA{P, H, M, C}, Γ::Vector{T}, i::Int) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real, C}
+function ∂ψ(
+    qaoa::QAOA, 
+    Γ::Vector{T}, 
+    i::Int
+    ) where {T<:Real}
     ψ = copy(qaoa.initial_state)
     # if typeof(qaoa.HC) <: AbstractGPUArray
     #     ψ = ψ |> MtlArray
@@ -308,11 +336,13 @@ function ∂ψ(qaoa::QAOA{P, H, M, C}, Γ::Vector{T}, i::Int) where {P<:Abstract
     return ψ
 end
 
-function ∂ψ(qaoa::QAOA{P, H, M, C}, Γ::Vector{T}, i::Int, j::Int) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real, C}
+function ∂ψ(qaoa::QAOA, 
+    Γ::Vector{T}, 
+    i::Int, 
+    j::Int
+    ) where {T<:Real}
     ψ = copy(qaoa.initial_state)
-    # if isa(qaoa.HC, MtlArray)
-    #     ψ = ψ |> MtlArray
-    # end
+
     @inbounds @simd for idx ∈ eachindex(Γ)
         if i==j
             if idx==i
@@ -340,7 +370,51 @@ function ∂ψ(qaoa::QAOA{P, H, M, C}, Γ::Vector{T}, i::Int, j::Int) where {P<:
     return ψ
 end
 
-function hessianCostFunction(qaoa::QAOA{P, H, M, C}, Γ::Vector{T}, idx::Vector{Int}) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real, C<:ClassicalCost}
+function hessianCostFunction(
+    qaoa::QAOA{C, SamplingMethod, P, H, M},
+    Γ::Vector{T},
+    idx::Vector{Int};
+    averaged_samples = 50,    # Number of measurements to average
+    step_size = 0.01,       # Step size for finite differences 
+) where {C<:ClassicalCost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
+    
+    
+    # Function to evaluate expectation with multiple samples for noise reduction
+    function evaluate_expectation(params)
+        return mean(qaoa(params) for _ in 1:averaged_samples)
+    end
+    
+    # Create parameter perturbations for finite difference
+
+    Γ_pp = copy(Γ); Γ_pp[idx[1]] += step_size;    Γ_pp[idx[2]] += step_size    # Both +h
+    Γ_pm = copy(Γ); Γ_pm[idx[1]] += step_size;    Γ_pm[idx[2]] -= step_size    # First +h, second -h
+    Γ_mp = copy(Γ); Γ_mp[idx[1]] -= step_size;    Γ_mp[idx[2]] += step_size    # First -h, second +h
+    Γ_mm = copy(Γ); Γ_mm[idx[1]] -= step_size;    Γ_mm[idx[2]] -= step_size    # Both -h
+    
+    # Evaluate at the perturbed points
+    f_pp = evaluate_expectation(Γ_pp)
+    f_pm = evaluate_expectation(Γ_pm)
+    f_mp = evaluate_expectation(Γ_mp)
+    f_mm = evaluate_expectation(Γ_mm)
+    f_0  = evaluate_expectation(Γ)
+    
+    # Calculate mixed second derivative using five-point stencil
+    if idx[1] == idx[2]  # Diagonal element
+        hessian_element = (-f_pp - f_mm + 16(f_mp + f_pm) - 30f_0) / (12*step_size^2)
+    else  # Off-diagonal element
+        hessian_element = (f_pp - f_pm - f_mp + f_mm) / (4*step_size^2)
+    end
+    
+    return T(hessian_element)
+end
+
+
+function hessianCostFunction(
+    qaoa::QAOA{C, ExactMethod, P, H, M}, 
+    Γ::Vector{T}, 
+    idx::Vector{Int}
+    ) where {C<:ClassicalCost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
+    
     ψ = getQAOAState(qaoa, Γ)
     ψRow    = ∂ψ(qaoa, Γ, idx[1])
     ψCol    = ∂ψ(qaoa, Γ, idx[2])
@@ -350,7 +424,11 @@ function hessianCostFunction(qaoa::QAOA{P, H, M, C}, Γ::Vector{T}, idx::Vector{
     return hessianElement
 end
 
-function hessianCostFunction(qaoa::QAOA{P, H, M, C}, Γ::Vector{T}, idx::Vector{Int}) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real, C<:QuantumCost}
+function hessianCostFunction(
+    qaoa::QAOA{C, ExactMethod, P, H, M}, 
+    Γ::Vector{T}, 
+    idx::Vector{Int}
+    ) where {C<:QuantumCost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
     ψ = getQAOAState(qaoa, Γ)
     ψRow    = ∂ψ(qaoa, Γ, idx[1])
     ψCol    = ∂ψ(qaoa, Γ, idx[2])
@@ -386,17 +464,21 @@ Calculate the Hessian index of a stationary (it checks the gradient norm) point 
 The function first calculates the gradient of the cost function for the given `qaoa` and `Γ`. If `checks=true`, it asserts that the norm of this gradient is less than `tol`. It then calculates the Hessian matrix and its eigenvalues, and returns the count of eigenvalues less than zero.
 
 """
-function getHessianIndex(qaoa::QAOA, Γ::Vector{T}; tol=T(1e-5)) where {T<:Real}
+function getHessianIndex(
+    qaoa::QAOA{C, ExactMethod, P, H, M}, 
+    Γ::Vector{T}; tol=T(1e-5)
+    ) where {C<:ClassicalCost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Real}
+    
     gn = norm(gradCostFunction(qaoa, Γ))
     if gn ≥ tol 
-        @info "Gradient norm is gn = $(gn) above the tolerance threshold. Check convergence" 
+        @info "Gradient norm is gn = $(gn) above the tolerance threshold t=$(tol). Check convergence" 
         return nothing
     end
 
     hessian_eigvals = hessianCostFunction(qaoa, Γ) |> eigvals
     @inbounds for i in eachindex(hessian_eigvals)
         if abs(hessian_eigvals[i]) < tol
-            @info "Degenerate critical point"
+            @info "Degenerate critical point!"
             return nothing
         end
     end

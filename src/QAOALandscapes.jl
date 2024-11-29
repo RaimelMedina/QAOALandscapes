@@ -32,8 +32,22 @@ export xorsat_dict
 abstract type AbstractQAOACost end
 abstract type QuantumCost <: AbstractQAOACost end
 abstract type ClassicalCost <: AbstractQAOACost end
+
+# Problem and Mixer types 
 abstract type AbstractProblem end
 abstract type AbstractMixer end
+
+# Measurement method hierarchy
+abstract type ExpectationMethod end
+struct ExactMethod <: ExpectationMethod end
+struct SamplingMethod <: ExpectationMethod
+    nshots::Int
+    
+    function SamplingMethod(nshots::Int)
+        nshots > 0 || throw(ArgumentError("Number of shots must be positive"))
+        new(nshots)
+    end
+end
 
 
 # using Requires
@@ -43,25 +57,26 @@ abstract type AbstractMixer end
 
 using Revise
 using GPUArrays
-using CUDA
+using Metal
 using SparseArrays
 using Graphs
 using ForwardDiff
 using Random
+using AbstractTrees
 using ProgressMeter
 using SimpleWeightedGraphs
-using Optim
+using Optimization
 using LineSearches
 using LinearAlgebra
 using ThreadsX
 using Statistics
+using FiniteDiff
+using StatsBase
 using Distributions
 using Base.Threads
 using Combinatorics
 using Convex
 using SCS
-
-
 
 function setRandomSeed(seed::Int)
     Random.seed!(seed)
@@ -75,7 +90,7 @@ include(joinpath("base", "gradient.jl"))
 include(joinpath("base", "layers.jl"))
 include(joinpath("base", "optimization_settings.jl"))
 include(joinpath("base", "parameters.jl"))
-# include(joinpath("base", "gpu.jl"))
+include(joinpath("base", "gpu.jl"))
 
 
 # inside /classical

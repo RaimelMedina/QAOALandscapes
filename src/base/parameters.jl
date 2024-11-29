@@ -1,23 +1,23 @@
-mutable struct Parameter{T<:Real} <: AbstractVector{T}
-    value::T
-    data::Vector{T}
-end
+# mutable struct Parameter{T<:Real} <: AbstractVector{T}
+#     value::T
+#     data::Vector{T}
+# end
 
-Base.getindex(p::Parameter, i::Int) = p.data[i]
-Base.size(p::Parameter) = size(p.data)
-Base.length(p::Parameter) = length(p.data)
-Base.setindex!(p::Parameter{T}, v::T, i::Int) where T<:Real = (p.data[i]=v)
+# Base.getindex(p::Parameter, i::Int) = p.data[i]
+# Base.size(p::Parameter) = size(p.data)
+# Base.length(p::Parameter) = length(p.data)
+# Base.setindex!(p::Parameter{T}, v::T, i::Int) where T<:Real = (p.data[i]=v)
 
-function setvalue!(param::Parameter{T}, qaoa::QAOA{P, H, M}) where {P, H, M, T<:Real}
-    param.value = qaoa(param)
-end
-function setvalue!(param::Parameter{T}, val::T) where T<:Real
-    param.value = val
-end
+# function setvalue!(param::Parameter{T}, qaoa::QAOA{P, H, M}) where {P, H, M, T<:Real}
+#     param.value = qaoa(param)
+# end
+# function setvalue!(param::Parameter{T}, val::T) where T<:Real
+#     param.value = val
+# end
 
-Parameter(vec::Vector{T}) where T<:Real = Parameter(T(0), vec)
+# Parameter(vec::Vector{T}) where T<:Real = Parameter(T(0), vec)
 
-(qaoa::QAOA{P, H, M})(param::Parameter{T}) where {P, H, M, T<:Real} = qaoa(param.data)
+# (qaoa::QAOA{P, H, M})(param::Parameter{T}) where {P, H, M, T<:Real} = qaoa(param.data)
 
 
 @doc raw"""
@@ -30,9 +30,9 @@ can be restricted even further to the ``[-\pi/4, \pi/4]`` interval (see [`here`]
 Finally, when dealing with regular graphs with odd degree `\gamma` paramaters can be brought to the ``[-\pi/4, \pi/4]`` interval.
 This function modifies inplace the initial input vector ``Γ``. 
 """
-function toFundamentalRegion!(qaoa::QAOA{P, H, M, C}, 
+function toFundamentalRegion!(qaoa::QAOA{C, P, H, M, S}, 
     Γ::AbstractVector{T}
-    ) where {P, H, M, T<:Real, C}
+    ) where {P, H, M, T<:Real, C, S}
     
     p = length(Γ) ÷ 2
     β = view(Γ, 2:2:2p)
@@ -40,24 +40,57 @@ function toFundamentalRegion!(qaoa::QAOA{P, H, M, C},
 
     problem_degree = qaoa.problem.degree
     isWeightedG    = qaoa.problem.weightedQ
-    isZ2invariant  = qaoa.problem.z2_sym
+    locality_of_terms  = qaoa.problem.locality
+    
+    if foldl(&, iseven.(locality_of_terms))
+        mixer_and_cost = :commute
+    elseif foldl(&, isodd.(locality_of_terms))
+        mixer_and_cost = :anticommute
+    else
+        mixer_and_cost = :nothing
+    end
+
 
     # When HB-> XMixer then we know that βₗ ∈ [-π/2, π/2)
-    # If HC is not weighted then we can also restrict γₗ ∈ [-π/2, π/2)
-    β .= mod.(β, π) .|> T
-    β[β .>= π/2] .-= T(π)
+    if M <: XMixer
+        # println("Reducing β parameters to: [-π/2, π/2)")
+        β .= mod.(β, π) .|> T
+        β[β .>= π/2] .-= T(π)
+    end
+    # When HC is not weighted then we can restrict γₗ ∈ [-π/2, π/2)
     if !isWeightedG
+        # println("Reducing γ parameters to: [-π/2, π/2)")
         γ .= mod.(γ, π) .|> T
         γ[γ .>= π/2] .-= T(π)
     end
-    if isZ2invariant
-        β .= mod.(β, π/2) .|> T
-        β[β .>= π/4] .-= T(π/2)  
+
+    # Until here all is beautiful and easy to understand
+
+    # When HC is Z₂ symmetric then performing exp(-i (β + π/2) HB) ∼ exp(-i β HB) (i σˣ)ⁿ
+    # does not affects the energy. With this, we fold β's to [-π/4, π/4)
+    if M <: XMixer
+        if mixer_and_cost == :commute
+            β .= mod.(β, π/2) .|> T
+            β[β .>= π/4] .-= T(π/2)
+        elseif mixer_and_cost == :anticommute
+            for i ∈ 1:p
+                if β[i] < -π/4 || β[i] ≥ π/4
+                    γ[1:i] .*= -1
+                    β[i] -= sign(β[i])*π/2 |> T
+                    for j in 1:p
+                        if γ[j] == π/4
+                           γ[j] *= -1
+                        end
+                    end
+                end
+            end
+        end
     end
+
     if !isnothing(problem_degree) && reduce(*, isodd.(problem_degree)) && !isWeightedG
+        # println("Reducing γ parameters to: [-π/4, π/4) affecting β indices")
         for i=1:p
             if γ[i] < -π/4 || γ[i] ≥ π/4 
-                @show "entering here" # now folding them even more: to -pi/4, pi/4 interval
                 β[i:end] .*= -1 # this requires sign flip of betas!
                 γ[i] -= sign(γ[i])*π/2 |> T
                 for j in 1:p
@@ -68,9 +101,16 @@ function toFundamentalRegion!(qaoa::QAOA{P, H, M, C},
             end
         end
     end
-    # if γ[1] < 0 # making angle gamma_1 positive
-    #     β .*= -1 # by changing the sign of ALL angles
-    #     γ .*= -1
-    # end
+
+    if !isnothing(problem_degree) && reduce(*, iseven.(problem_degree)) && !isWeightedG
+        # println("Reducing γ parameters to: [-π/4, π/4)")
+        γ .= mod.(γ, π/2) .|> T
+        γ[γ .>= π/4] .-= T(π/2)
+    end
+    if γ[1] < 0 # making angle gamma_1 positive
+        # println("γ₁ negative -> flipping sign of all paramaters")
+        β .*= -1 # by changing the sign of ALL angles
+        γ .*= -1
+    end
     return nothing
 end

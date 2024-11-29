@@ -167,11 +167,11 @@ end
 
 
 function modulatedNewton(
-    qaoa::QAOA{P, H, M}, 
+    qaoa::QAOA{C, P, H, M}, 
     Γ0::Vector{T},
     niter::Int=1_000; 
     verbose=false
-    ) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:AbstractFloat}
+    ) where {C <: ClassicalCost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:AbstractFloat}
     
     Γ = similar(Γ0)
     Γ .= Γ0 
@@ -216,11 +216,11 @@ function modulatedNewton(
 end
 
 function modulatedNewtonSaddles(
-    qaoa::QAOA{P, H, M}, 
+    qaoa::QAOA{C, P, H, M}, 
     Γ0::Vector{T}, 
     niter::Int=1_000;
     verbose=false
-    ) where {P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:AbstractFloat}
+    ) where {C<:ClassicalCost ,P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:AbstractFloat}
 
     Γ = similar(Γ0)
     Γ .= Γ0 

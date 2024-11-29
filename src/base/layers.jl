@@ -43,7 +43,7 @@ function applyExpLayer!(hc::Vector{T}, ψ::Vector{K}, γ::R) where {T, K, R}
     return nothing
 end
 
-function applyQAOALayer!(q::QAOA{P, H, M, C}, elem::T, index::Int, ψ0::Vector{R}) where {P, H, M, T, R, C}
+function applyQAOALayer!(q::QAOA, elem::T, index::Int, ψ0::AbstractVector{R}) where {T, R}
     if isodd(index)
         applyExpLayer!(q.HC, ψ0, elem)
     else
@@ -52,7 +52,7 @@ function applyQAOALayer!(q::QAOA{P, H, M, C}, elem::T, index::Int, ψ0::Vector{R
     return nothing
 end
 
-function applyQAOALayerDerivative!(qaoa::QAOA{P, H, M, C}, elem::T, pos::Int, state::Vector{R}) where {P, H, M, T, R, C}
+function applyQAOALayerDerivative!(qaoa::QAOA, elem::T, pos::Int, state::AbstractVector{R}) where {T, R}
     applyQAOALayer!(qaoa, elem, pos, state)
     if isodd(pos)
         Hc_ψ!(qaoa.HC, state)
@@ -65,7 +65,7 @@ function applyQAOALayerDerivative!(qaoa::QAOA{P, H, M, C}, elem::T, pos::Int, st
     return nothing
 end
 
-function applyQAOALayerDerivative!(qaoa::QAOA{P, H, M, C}, elem::T, pos::Int, state::Vector{R}, result::Vector{R}) where {P, H, M, T, R, C}
+function applyQAOALayerDerivative!(qaoa::QAOA, elem::T, pos::Int, state::AbstractVector{R}, result::AbstractVector{R}) where {T, R}
     applyQAOALayer!(qaoa, elem, pos, state)
     if isodd(pos)
         Hc_ψ!(qaoa.HC, state)

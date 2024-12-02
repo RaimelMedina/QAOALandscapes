@@ -159,7 +159,7 @@ function ClassicalProblem(T::Type{<:Real}, mat::BitMatrix, J::Vector{Int})
 end
 
 
-function hamiltonian(cp::ClassicalProblem{T}, sym_sector = true) where T
+function hamiltonian(cp::ClassicalProblem{T}, sym_sector::Bool = true) where T
     # Trying to avoid repeated allocations
     element_buffer = Vector{Bool}(undef, maximum(length(term) for term in keys(cp.interactions)))
     

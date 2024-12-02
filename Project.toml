@@ -5,6 +5,7 @@ version = "1.0.0-DEV"
 
 [deps]
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
 Convex = "f65535da-76fb-5f13-bab9-19810c17039a"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
@@ -34,6 +35,7 @@ ThreadsX = "ac1d9e8a-700a-412c-b207-f0111f4b6c0d"
 
 [compat]
 AbstractTrees = "0.4.5"
+CUDA = "5.5.2"
 Enzyme = "0.13.16"
 FiniteDiff = "2.26.2"
 KernelAbstractions = "0.9.29"

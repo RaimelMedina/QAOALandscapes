@@ -57,7 +57,7 @@ end
 
 using Revise
 using GPUArrays
-using Metal
+using CUDA
 using SparseArrays
 using Graphs
 using ForwardDiff

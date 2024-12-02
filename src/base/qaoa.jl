@@ -80,7 +80,7 @@ function QAOA(cp::ClassicalProblem{R}, ham::S) where {R<:Real, S<:AbstractGPUArr
     else
         @assert cp.n == Int(log2(dim))
     end
-    ψ0 = Metal.fill(T(1/sqrt(dim)), dim)
+    ψ0 = CUDA.fill(T(1/sqrt(dim)), dim)
 
     return QAOA{ClassicalCost, ExactMethod, K, S, typeof(mixer)}(cp.n, cp, ham, mixer, ψ0, nothing)
 end

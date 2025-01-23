@@ -1,54 +1,71 @@
 @doc raw"""
-    transitionState(Γp::Vector{Float64}, i::Int; tsType='symmetric')
+    TSInitialization(Γ::Vector{T}, iγ::Int; tsType::Val{S}=Val(:symmetric)) where {T<:Real, S}
 
-Given an initial state `Γp::Vector{Float64}` of length `2p` it creates another vector
-`ΓTs` of size `2p+2` such that the `i`-th γ component of `ΓTs` is 0 and the `i`-th (`i-1`-th) 
-β component of `ΓTs` is zero if `tsType='symmetric'` (`tsType='non_symmetric'`) while all the other components
-are the same as `Γp`
+Given an initial state `Γ` of length `2p`, creates a vector of length `2p+2` where:
+- The `iγ`-th γ component is zero
+- If `tsType=Val(:symmetric)`: the `iγ`-th β component is zero
+- If `tsType=Val(:non_symmetric)`: the `(iγ-1)`-th β component is zero
+All other components remain unchanged from `Γ`.
 
-# Keyword arguments
-* `tsType='symmetric'` Only strings values 'symmetric' and 'non_symmetric' are accepted
+# Arguments
+- `Γ::Vector{T}`: Initial state vector of length 2p
+- `iγ::Int`: Index for transition state insertion
+- `tsType::Val{S}=Val(:symmetric)`: Transition state type (`:symmetric` or `:non_symmetric`)
 """
-function transitionState(Γ::Vector{T}, iγ::Int; tsType="symmetric", regularize=false) where T <: Real
+function TSInitialization(Γ::Vector{T}, iγ::Int, tsType::Val{S}=Val(:symmetric)) where {T <: Real, S}
     p = length(Γ) ÷ 2
-    β = Γ[2:2:2p]
-    γ = Γ[1:2:2p]
-
-    val = regularize ? cbrt(eps(T)) : T(0)
-    insert!(γ, iγ, val)
-    if tsType == "symmetric"
-        insert!(β, iγ, val)
-    elseif tsType == "non_symmetric"
-        insert!(β, iγ-1, val)
-    else
-        throw(ArgumentError("Only 'symmetric' and 'non_symmetric' values are accepted"))
+    val = zero(T)
+    
+    ΓTS = Vector{T}(undef, 2(p+1))
+    
+    @inbounds for i in 1:iγ-1
+        ΓTS[2i-1] = Γ[2i-1]
+        ΓTS[2i] = Γ[2i]
     end
     
-    ΓTS = zeros(T, 2(p+1))
-    ΓTS[2:2:2(p+1)] = β
-    ΓTS[1:2:2(p+1)] = γ
-
+    ΓTS[2iγ-1] = val
+    if S === :symmetric
+        ΓTS[2iγ] = val
+    elseif S === :non_symmetric
+        ΓTS[2(iγ-1)] = val
+    else
+        throw(ArgumentError("Only :symmetric and :non_symmetric values are accepted"))
+    end
+    
+    @inbounds for i in iγ:p
+        ΓTS[2(i+1)-1] = Γ[2i-1]
+        ΓTS[2(i+1)] = Γ[2i]
+    end
+    
     return ΓTS
 end
 
 @doc raw"""
-    transitionState(Γp::Vector{Float64})
+    transitionState(Γmin::Vector{T}) where T<:Real
 
-Given an initial state `Γp::Vector{Float64}` of length ``2p`` it creates a matrix ``M_{\rm{TS}}`` of size ``2p+2 \times 2p+1``. 
-The columns of ``M_{\rm{TS}}`` corresponds to the transition states associated with the initial minimum `Γp`. The first `p+1` 
-columns correspond to symmetric TS while the remaining `p` columns correspond to non-symmetric TS.
+Generates a transition state matrix `MTS` of size `(2p+2) × (2p+1)` from initial state `Γmin`.
+
+# Matrix Structure
+- First `p+1` columns: symmetric transition states
+- Remaining `p` columns: non-symmetric transition states
+
+# Arguments
+- `Γmin::Vector{T}`: Initial minimum state vector of length 2p
 """
-function transitionState(Γmin::Vector{T}; regularize=false) where T<:Real
+function TSInitialization(Γmin::Vector{T}) where T<:Real
     p = length(Γmin) ÷ 2
-    vectorOfTS = Vector{T}[]
+    vectorOfTS = zeros(T, 2p + 2, 2p + 1)
     
+    col = 1
     for i ∈ 1:p+1
-        push!(vectorOfTS, transitionState(Γmin, i, tsType="symmetric", regularize=regularize))
+        vectorOfTS[:, col] = TSInitialization(Γmin, i, Val(:symmetric))
+        col += 1
     end
     for i ∈ 2:p+1
-        push!(vectorOfTS, transitionState(Γmin, i, tsType="non_symmetric", regularize=regularize))
+        vectorOfTS[:, col] = TSInitialization(Γmin, i, Val(:non_symmetric))
+        col += 1
     end
-    vectorOfTS = reduce(hcat,vectorOfTS)
+    return vectorOfTS
 end
 
 @doc raw"""
@@ -77,25 +94,29 @@ that the obtained vectors have lower energy than the initial vector `Γmin`
 # Return
 * `result:Tuple`. The returned paramaters are as follows => `Γmin_m, Γmin_p, Emin_m, Emin_p, info_m, info_p`
 """
-function rollDownfromTS(qaoa::QAOA{C, S, P, H, M}, 
+function rollDown(qaoa::QAOA, 
     Γmin::Vector{T}, 
-    ig::Int; 
-    ϵ=T(0.001), 
-    tsType="symmetric", 
-    setup=OptSetup()
-    ) where {C<:AbstractQAOACost, S<:ExpectationMethod, P, H, M, T<:Real}
+    ig::Int, 
+    tsType::Val{S},
+    init::K, alg
+    ) where {T<:Real, S, K <: TSInitialization}
 
-    ΓTs = transitionState(Γmin, ig, tsType=tsType)
+    ΓTs = TSInitialization(Γmin, ig, tsType)
     umin = getNegativeHessianEigvec(qaoa, Γmin, ig, tsType=tsType)["eigvec_approx"] |> Array
     
-    Γ0_p = ΓTs + ϵ*umin
-    Γ0_m = ΓTs - ϵ*umin
+    Γ0_p = ΓTs + init.ϵ*umin
+    Γ0_m = ΓTs - init.ϵ*umin
     
-    Γmin_p, Emin_p = optimizeParameters(qaoa, Γ0_p; setup=setup);
-    Γmin_m, Emin_m = optimizeParameters(qaoa, Γ0_m; setup=setup);
+    solutions = [optimizeParameters(qaoa, x, alg) for x in [Γ0_p, Γ0_m]]
     
-    return [Γmin_m, Γmin_p, [Emin_m, Emin_p]]
+    return TSResult(
+        reduce(hcat, map(x->getproperty(x, :u), solutions)), 
+        map(x->getproperty(x, :objective), solutions),
+        ig,
+        tsType
+    )
 end
+
 
 @doc raw"""
     rollDownTS(qaoa::QAOA, Γmin::Vector{Float64}; ϵ=0.001, optim=Val(:BFGS))
@@ -119,35 +140,29 @@ that the obtained vectors have lower energy than the initial vector `Γmin`
 # Return
 * `result:Tuple`. The returned paramaters are as follows => `Γmin_m, Γmin_p, Emin_m, Emin_p, info_m, info_p`
 """
-function rollDownTS(qaoa::QAOA{C, S, P, H, M}, Γmin::Vector{T}; 
-    setup=OptSetup(),
-    ϵ=T(0.001), 
-    threaded=false
-    ) where {C<:AbstractQAOACost, S<:ExpectationMethod, P, H, M, T<:Real}
-
+function rollDown(
+        qaoa::QAOA,
+        Γmin::Vector{T},
+        init::K,
+        alg
+    ) where {T<:Real, K <: TSInitialization}
+    
     p = length(Γmin) ÷ 2
-    parametersResult = Dict{String, Vector{Vector{T}}}()  
-    energiesResult   = Dict{String, Vector{T}}()
-    dictTS  = Dict{String, Vector{Vector{T}}}()
-    
-    indices = [[(x, "symmetric") for x in 1:p+1]; [(x, "non_symmetric") for x in 2:p+1]]
+    indices = [[(x, Val(:symmetric)) for x in 1:p+1]; 
+    [(x, Val(:non_symmetric)) for x in 2:p+1]]
 
-    if threaded
-        ThreadsX.map(pair -> begin
-        x, tsType = pair
-        dictTS[string((x, x - (tsType == "non_symmetric")))] = rollDownfromTS(qaoa, Γmin, x; setup=setup, ϵ=ϵ, tsType=tsType)
-        end, indices)
-    else
-        map(pair -> begin
-        x, tsType = pair
-        dictTS[string((x, x - (tsType == "non_symmetric")))] = rollDownfromTS(qaoa, Γmin, x; setup=setup, ϵ=ϵ, tsType=tsType)
-        end, indices)
-    end
-    
-    for l in keys(dictTS)
-        parametersResult[l] = dictTS[l][1:2]
-        energiesResult[l]   = dictTS[l][3]
+    optimizationResult = [TSResult{T, indices[i][2] |> typeof}(undef) for i in 1:2p+1]
+    # # Create thread-local storage without sizehint
+    # thread_results = [TSResult{T}[] for _ in 1:Threads.nthreads()]
+
+    Threads.@threads for v in eachindex(indices)
+        idx, ts_type = indices[v]
+        result = rollDown(qaoa, Γmin, idx, ts_type, init, alg)
+        # Push to thread-local storage
+        optimizationResult[v] = result
     end
 
-    return parametersResult, energiesResult
+    # Combine results from all threads
+    # optimizationResult = reduce(vcat, thread_results)
+    return optimizationResult
 end

@@ -30,9 +30,9 @@ can be restricted even further to the ``[-\pi/4, \pi/4]`` interval (see [`here`]
 Finally, when dealing with regular graphs with odd degree `\gamma` paramaters can be brought to the ``[-\pi/4, \pi/4]`` interval.
 This function modifies inplace the initial input vector ``Γ``. 
 """
-function toFundamentalRegion!(qaoa::QAOA{C, P, H, M, S}, 
+function toFundamentalRegion!(qaoa::QAOA, 
     Γ::AbstractVector{T}
-    ) where {P, H, M, T<:Real, C, S}
+    ) where {T<:Real}
     
     p = length(Γ) ÷ 2
     β = view(Γ, 2:2:2p)
@@ -50,10 +50,8 @@ function toFundamentalRegion!(qaoa::QAOA{C, P, H, M, S},
         mixer_and_cost = :nothing
     end
 
-
     # When HB-> XMixer then we know that βₗ ∈ [-π/2, π/2)
-    if M <: XMixer
-        # println("Reducing β parameters to: [-π/2, π/2)")
+    if typeof(qaoa.mixer) <: XMixer
         β .= mod.(β, π) .|> T
         β[β .>= π/2] .-= T(π)
     end
@@ -68,7 +66,7 @@ function toFundamentalRegion!(qaoa::QAOA{C, P, H, M, S},
 
     # When HC is Z₂ symmetric then performing exp(-i (β + π/2) HB) ∼ exp(-i β HB) (i σˣ)ⁿ
     # does not affects the energy. With this, we fold β's to [-π/4, π/4)
-    if M <: XMixer
+    if typeof(qaoa.mixer) <: XMixer
         if mixer_and_cost == :commute
             β .= mod.(β, π/2) .|> T
             β[β .>= π/4] .-= T(π/2)

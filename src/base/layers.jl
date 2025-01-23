@@ -1,4 +1,4 @@
-function applyExpX!(psi::Vector{T}, k::Int, cos_a::R, sin_a::R) where {T, R}
+function applyExpX!(psi::AbstractVector{T}, k::Int, cos_a::R, sin_a::R) where {T<:Complex, R}
     dim = length(psi)
     bitmask = 1 << (k-1)
     @inbounds for index in 0:(dim-1)
@@ -17,7 +17,7 @@ function applyExpX!(psi::Vector{T}, k::Int, cos_a::R, sin_a::R) where {T, R}
     return nothing
 end
 
-function applyExpLayer!(mixer::XMixer, psi::Vector{T}, β::R) where {T, R}
+function applyExpLayer!(mixer::XMixer, psi::AbstractVector{T}, β::R) where {T<:Complex, R}
     cβ = cos(β)
     sβ = sin(β)
     
@@ -36,14 +36,14 @@ function applyExpLayer!(mixer::XMixer, psi::Vector{T}, β::R) where {T, R}
     return nothing
 end
 
-function applyExpLayer!(hc::Vector{T}, ψ::Vector{K}, γ::R) where {T, K, R}
+function applyExpLayer!(hc::Vector{T}, ψ::AbstractVector{K}, γ::R) where {T, K<:Complex, R}
     for i in eachindex(hc)
         ψ[i] *= exp(-im * γ * hc[i])
     end
     return nothing
 end
 
-function applyQAOALayer!(q::QAOA, elem::T, index::Int, ψ0::AbstractVector{R}) where {T, R}
+function applyQAOALayer!(q::QAOA, elem::T, index::Int, ψ0::AbstractVector{R}) where {T, R<:Complex}
     if isodd(index)
         applyExpLayer!(q.HC, ψ0, elem)
     else
@@ -52,7 +52,7 @@ function applyQAOALayer!(q::QAOA, elem::T, index::Int, ψ0::AbstractVector{R}) w
     return nothing
 end
 
-function applyQAOALayerDerivative!(qaoa::QAOA, elem::T, pos::Int, state::AbstractVector{R}) where {T, R}
+function applyQAOALayerDerivative!(qaoa::QAOA, elem::T, pos::Int, state::AbstractVector{R}) where {T, R<:Complex}
     applyQAOALayer!(qaoa, elem, pos, state)
     if isodd(pos)
         Hc_ψ!(qaoa.HC, state)
@@ -65,7 +65,7 @@ function applyQAOALayerDerivative!(qaoa::QAOA, elem::T, pos::Int, state::Abstrac
     return nothing
 end
 
-function applyQAOALayerDerivative!(qaoa::QAOA, elem::T, pos::Int, state::AbstractVector{R}, result::AbstractVector{R}) where {T, R}
+function applyQAOALayerDerivative!(qaoa::QAOA, elem::T, pos::Int, state::AbstractVector{R}, result::AbstractVector{R}) where {T, R<:Complex}
     applyQAOALayer!(qaoa, elem, pos, state)
     if isodd(pos)
         Hc_ψ!(qaoa.HC, state)

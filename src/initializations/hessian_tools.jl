@@ -9,10 +9,10 @@ the cost of computing two matrix elements of a Hessian.
 function getNegativeHessianEigval(qaoa::QAOA, 
     Γmin::Vector{T}, 
     ig::Int; 
-    tsType="symmetric"
+    tsType=Val(:symmetric)
     ) where {T<:Real}
 
-    ΓTs = transitionState(Γmin, ig, tsType=tsType)
+    ΓTs = TSInitialization(Γmin, ig, tsType)
     p    = length(Γmin) ÷ 2
     
     γIdx = 1:2:(2p+2)
@@ -51,7 +51,7 @@ Basically, the last two rows and columns of the transformed Hessian correspond t
 * `listOfIndices::Vector{Int64}`: List of indices correponding to the arrangement of the new basis elements.
 * `permMat::Matrix{Float64}`: Matrix implementing the desired permutation.
 """
-function permuteHessian(T::Type{<:Real}, depth::Int, i::Int; tsType="symmetric")
+function permuteHessian(T::Type{<:Real}, depth::Int, i::Int; tsType=Val(:symmetric))
     dim = 2*depth
 
     γIdx = 1:2:dim
@@ -59,9 +59,9 @@ function permuteHessian(T::Type{<:Real}, depth::Int, i::Int; tsType="symmetric")
 
     lastIndices = zeros(T, 2)
 
-    if tsType == "symmetric"
+    if tsType == Val(:symmetric)
         lastIndices = [γIdx[i], βIdx[i]] 
-    elseif tsType == "non_symmetric"
+    elseif tsType == Val(:non_symmetric)
         lastIndices = [βIdx[i-1], γIdx[i]] 
     else
         throw(ArgumentError("Only 'symmetric' and 'non_symmetric' values are accepted"))
@@ -119,7 +119,7 @@ the approximate and true eigenvector
 function getNegativeHessianEigvec(qaoa::QAOA{C, P, H, M}, 
     Γmin::Vector{T}, 
     ig::Int; 
-    tsType="symmetric", 
+    tsType=Val(:symmetric), 
     doChecks=false
     ) where {P, H, M, T<:Real, C<:AbstractQAOACost}
     
@@ -138,7 +138,7 @@ function getNegativeHessianEigvec(qaoa::QAOA{C, P, H, M},
     #we use bbar, or more specifically its sign to determine
     #the approximate eigenvector
 
-    if tsType == "symmetric"
+    if tsType == Val(:symmetric)
         if (ig != p+1) && (ig != 1)
             RowTransform[dim-1, γIdx[ig]]   = -1
             RowTransform[dim  , βIdx[ig-1]] = -1
@@ -160,7 +160,7 @@ function getNegativeHessianEigvec(qaoa::QAOA{C, P, H, M},
             vApproximate[dim-1], vApproximate[dim] = -sign(bbar)*sqrt(2/3), 1/sqrt(3)
          end
         
-    elseif tsType == "non_symmetric"
+    elseif tsType == Val(:non_symmetric)
         if ig==1
             throw(ArgumentError("Index of the gamma parameter cannot be 1 for the non-sym TS"))
         else
@@ -193,7 +193,7 @@ function getNegativeHessianEigvec(qaoa::QAOA{C, P, H, M},
     if doChecks
         result["change_basis"] = basisTransformation
         
-        ΓTs = transitionState(Γmin, ig, tsType=tsType)
+        ΓTs = TSInitialization(Γmin, ig, tsType)
         HTs = hessianCostFunction(qaoa, ΓTs)
         λtrue, ψtrue = eigen(HTs)
         

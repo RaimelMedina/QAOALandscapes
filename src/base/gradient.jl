@@ -6,18 +6,20 @@ mutable struct GradientTape{T <: AbstractVector}
 
     function GradientTape(qaoa::QAOA{C, ExactMethod, P, H, M}
         ) where {C<:AbstractQAOACost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer}
-        return new{H}(copy(qaoa.initial_state), 
-            copy(qaoa.initial_state), 
-            copy(qaoa.initial_state), 
-            copy(qaoa.initial_state)
-            )
+        
+        return new{H}(
+            similar(qaoa.HC), 
+            similar(qaoa.HC), 
+            similar(qaoa.HC), 
+            similar(qaoa.HC)
+        )
     end
 end
 
 function gradient!(G::Vector{T}, qaoa::QAOA{C, ExactMethod, P, H, M}, gradTape::GradientTape{H}, params::Vector{T}
     ) where {C<:ClassicalCost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T}
     # this will update/populate qaoa.state which we will call |λ⟩ following the paper
-    gradTape.λ = getQAOAState(qaoa, params)
+    getQAOAState(qaoa, params, gradTape.λ)
     
     # |ϕ⟩ := |λ⟩
     gradTape.ϕ .= gradTape.λ
@@ -59,7 +61,7 @@ function gradient!(
     ) where {C<:QuantumCost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T, }
     
     # this will update/populate qaoa.state which we will call |λ⟩ following the paper
-    gradTape.λ = getQAOAState(qaoa, params)
+    getQAOAState(qaoa, params, gradTape.λ)
     λ_hx = copy(gradTape.λ)
     
     # |ϕ⟩ := |λ⟩
@@ -322,10 +324,10 @@ function ∂ψ(
     Γ::Vector{T}, 
     i::Int
     ) where {T<:Real}
-    ψ = copy(qaoa.initial_state)
-    # if typeof(qaoa.HC) <: AbstractGPUArray
-    #     ψ = ψ |> MtlArray
-    # end
+
+    ψ = similar(qaoa.HC)
+    ψ .= 1/sqrt(length(qaoa.HC))
+
     @inbounds @simd for idx ∈ eachindex(Γ)
         if idx==i
             applyQAOALayerDerivative!(qaoa, Γ[idx], idx, ψ)
@@ -341,7 +343,9 @@ function ∂ψ(qaoa::QAOA,
     i::Int, 
     j::Int
     ) where {T<:Real}
-    ψ = copy(qaoa.initial_state)
+    
+    ψ = similar(qaoa.HC)
+    ψ .= 1/sqrt(length(qaoa.HC))
 
     @inbounds @simd for idx ∈ eachindex(Γ)
         if i==j

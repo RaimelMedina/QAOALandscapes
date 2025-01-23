@@ -86,7 +86,7 @@ function sk_problem(N::Int, σ::T) where T<:AbstractFloat
 end
 
 function cRegular3XORSAT(N::Int, M::Int, c::Int)
-    @assert M == (N*c) ÷ 3 "Number of spins, interactions, and regularity does not satisfy 3*M=N*c"
+    @assert 3*M == (N*c) "Number of spins, interactions, and regularity does not satisfy 3*M=N*c"
     
     adjH = falses(M, N) # rows -> interaction terms and columns -> spins
 

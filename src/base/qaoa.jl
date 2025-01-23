@@ -23,26 +23,10 @@ struct QAOA{C<:AbstractQAOACost, E<:ExpectationMethod, K<:AbstractProblem, T<:Ab
     problem::K
     HC::T
     mixer::M
-    initial_state::T
     nshots::Union{Int, Nothing}  # Only used when E <: SamplingMethod
-    
-    # # Constructor for ExactMethod
-    # function QAOA{C, ExactMethod, K, T, M}(
-    #     N::Int, problem::K, HC::T, mixer::M, initial_state::T
-    # ) where {C<:AbstractQAOACost, K<:AbstractProblem, T<:AbstractVector, M<:AbstractMixer}
-    #     new{C, ExactMethod, K, T, M}(N, problem, HC, mixer, initial_state)
-    # end
-    
-    # # Constructor for SamplingMethod
-    # function QAOA{C, SamplingMethod, K, T, M}(
-    #     N::Int, problem::K, HC::T, mixer::M, initial_state::T, nshots::Int
-    # ) where {C<:AbstractQAOACost, K<:AbstractProblem, T<:AbstractVector, M<:AbstractMixer}
-    #     nshots > 0 || throw(ArgumentError("Number of shots must be positive"))
-    #     new{C, SamplingMethod, K, T, M}(N, problem, HC, mixer, initial_state, nshots)
-    # end
 end
 
-@doc raw"""
+"""
     QAOA(cp::ClassicalProblem{R}) where {R<:Real}
 
 Construct a QAOA instance for a classical problem using exact expectation value calculations.
@@ -59,30 +43,13 @@ function QAOA(cp::ClassicalProblem{R}) where {R<:Real}
     T = typeof(ham)
     M = typeof(mixer)
     K = typeof(cp)
-    z2_sym = foldl(&, iseven.(cp.locality))
-    if z2_sym
-        ψ0 = fill(Complex{R}(1/sqrt(2^(cp.n-1))), 2^(cp.n-1))
-    else
-        ψ0 = fill(Complex{R}(1/sqrt(2^(cp.n))), 2^(cp.n))
-    end
-    return QAOA{ClassicalCost, ExactMethod, K, T, M}(cp.n, cp, ham, mixer, ψ0, nothing)
+    return QAOA{ClassicalCost, ExactMethod, K, T, M}(cp.n, cp, ham, mixer, nothing)
 end
 
 function QAOA(cp::ClassicalProblem{R}, ham::S) where {R<:Real, S<:AbstractGPUArray{Complex{R}}}
-    T = eltype(ham)
     mixer = XMixer(cp.n)
     K = typeof(cp)
-    dim = length(ham)
-    z2_sym = foldl(&, iseven.(cp.locality))
-
-    if z2_sym
-        @assert cp.n-1 == Int(log2(dim))
-    else
-        @assert cp.n == Int(log2(dim))
-    end
-    ψ0 = CUDA.fill(T(1/sqrt(dim)), dim)
-
-    return QAOA{ClassicalCost, ExactMethod, K, S, typeof(mixer)}(cp.n, cp, ham, mixer, ψ0, nothing)
+    return QAOA{ClassicalCost, ExactMethod, K, S, typeof(mixer)}(cp.n, cp, ham, mixer, nothing)
 end
 
 @doc raw"""
@@ -104,18 +71,13 @@ function QAOA(cp::ClassicalProblem{R}, nshots::Int) where {R<:Real}
     T = typeof(ham)
     M = typeof(mixer)
     K = typeof(cp)
-    z2_sym = foldl(&, iseven.(cp.locality))
-    if z2_sym
-        ψ0 = fill(Complex{R}(1/sqrt(2^(cp.n-1))), 2^(cp.n-1))
-    else
-        ψ0 = fill(Complex{R}(1/sqrt(2^(cp.n))), 2^(cp.n))
-    end
-    return QAOA{ClassicalCost, SamplingMethod, K, T, M}(cp.n, cp, ham, mixer, ψ0, nshots)
+    
+    return QAOA{ClassicalCost, SamplingMethod, K, T, M}(cp.n, cp, ham, mixer, nshots)
 end
 
 # Show method
 function Base.show(io::IO, qaoa::QAOA{C, E, P, H, M}) where {C, E, P, H, M}
-    storage_str = (H <: AbstractGPUArray) ? "Metal-GPU" : "CPU"
+    storage_str = (H <: AbstractGPUArray) ? "GPU" : "CPU"
     println(io, "QAOA object on $(qaoa.N) qubits with mixer type `$(M)`")
     println(io, "Running on the " * storage_str * " backend")
     str2 = if E === ExactMethod
@@ -140,8 +102,12 @@ with
 ```
 and ``H_B, H_C`` corresponding to the mixing and cost Hamiltonian respectively.
 """
-function getQAOAState(q::QAOA, Γ::T) where {T<:AbstractVector}
-    ψ = copy(q.initial_state)
+function getQAOAState(q::QAOA, Γ::AbstractVector{T}) where T<:Real
+    dim = length(q.HC)
+
+    ψ::AbstractVector{Complex{T}} = similar(q.HC)
+    ψ .= Complex{T}(1/sqrt(dim))
+    
     for i in eachindex(Γ)
         applyQAOALayer!(q, Γ[i], i, ψ)
     end
@@ -162,12 +128,16 @@ with
 ```
 and ``H_B, H_C`` corresponding to the mixing and cost Hamiltonian respectively.
 """
-function getQAOAState(q::QAOA, Γ::AbstractVector{T}, ψ0::H) where {H, T}
-    ψ = copy(ψ0)
+function getQAOAState(q::QAOA, Γ::AbstractVector{T}, ψ0::H) where {H, T<:Real}
+    dim = length(q.HC)
+    @assert dim == length(ψ0)
+
+    ψ0 .= Complex{T}(1/sqrt(dim))
+    
     for i in eachindex(Γ)
-        applyQAOALayer!(q, Γ[i], i, ψ)
+        applyQAOALayer!(q, Γ[i], i, ψ0)
     end
-    return ψ
+    return ψ0
 end
 
 @doc raw"""
@@ -181,7 +151,7 @@ Compute the exact expectation value of the classical cost Hamiltonian Hᶜ for t
 # Returns
 The expectation value E(Γ) = ⟨Γᵖ|Hᶜ|Γᵖ⟩
 """
-function (q::QAOA{C, ExactMethod, P, H, M})(Γ::AbstractVector{R}) where {C<:ClassicalCost, P, H, M, R}
+function (q::QAOA{C, ExactMethod, P, H, M})(Γ::AbstractVector{T}) where {C<:ClassicalCost, P, H, M, T<:Real}
     ψ = getQAOAState(q, Γ)
     return real(dot(ψ, q.HC .* ψ))
 end

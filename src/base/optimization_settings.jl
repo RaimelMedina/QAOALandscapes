@@ -107,7 +107,18 @@ end
 # result = optimizeParameters(qaoa, params, method=Optim.BFGS(linesearch=Optim.HagerZhang()), printout=true)
 # ```
 # """
-# function optimizeParameters(qaoa::QAOA{C, S, P, H, M}, 
+function optimizeParameters(qaoa::QAOA, 
+    param::Vector{T},
+    alg,
+    args...;
+    kwargs...) where {T<:Real}
+    
+    opt_prob = construct_optimization_problem(qaoa, param, AutoEnzyme())
+    return solve(opt_prob, alg, args...; kwargs...)
+end
+
+
+# function optimizeParameters(qaoa::QAOA, 
 #     params::Vector{T};
 #     setup = OptSetup(),
 #     fun_calls=false
@@ -326,35 +337,37 @@ end
 #     return energ_res_m, energ_res_p
 # end
 
-# @doc raw"""
-#     getInitialParameter(qaoa::QAOA; spacing = 0.01, gradTol = 1e-6)
+@doc raw"""
+    getInitialParameter(qaoa::QAOA; spacing = 0.01, gradTol = 1e-6)
 
-# Given a `QAOA` object it performs a grid search on a region of the two dimensional space spanned by ``\{ \gamma_1, \beta_1\}``
-# The ``\beta_1`` component is in the interval ``[-\pi/4, \pi/4]`` while the ``\gamma_1`` part is in the ``(0, \pi/4]`` for 3RRG
-# or ``(0, \pi/2]`` for dRRG (with ``d\neq 3``). 
+Given a `QAOA` object it performs a grid search on a region of the two dimensional space spanned by ``\{ \gamma_1, \beta_1\}``
+The ``\beta_1`` component is in the interval ``[-\pi/4, \pi/4]`` while the ``\gamma_1`` part is in the ``(0, \pi/4]`` for 3RRG
+or ``(0, \pi/2]`` for dRRG (with ``d\neq 3``). 
 
-# We then launch the `QAOA` optimization procedure from the point in the 2-dimensional grid with the smallest cost function value.
+We then launch the `QAOA` optimization procedure from the point in the 2-dimensional grid with the smallest cost function value.
 
-# # Returns
-# * 3-Tuple containing: 1.) the cost function grid, 2.) the optimal parameter, and 3.) the optimal energy
-# """
-# function getInitialParameter(qaoa::QAOA{C, S, P, H, M}; 
-#     setup=OptSetup(), 
-#     num_points=20, 
-#     ) where {C, S, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer}
+# Returns
+* 3-Tuple containing: 1.) the cost function grid, 2.) the optimal parameter, and 3.) the optimal energy
+"""
+function getInitialParameter(qaoa::QAOA,
+    alg, 
+    num_points::Int=20 
+    )
     
-#     T = qaoa.problem |> eltype
-#     initial_points = rand(T, 2, num_points)*2π
-#     energies_points = zeros(T, num_points)
-#     params_points  = zeros(T, 2, num_points)
+    T = qaoa.problem |> eltype
+    @info T
+    initial_points = rand(T, 2, num_points)*2π
+    energies_points = zeros(T, num_points)
+    params_points  = zeros(T, 2, num_points)
 
-#     for i ∈ 1:num_points
-#         (params_points[:, i], energies_points[i]) = optimizeParameters(qaoa, Vector(initial_points[:, i]), setup=setup)
-#     end
+    for i ∈ 1:num_points
+        sol = optimizeParameters(qaoa, Vector(initial_points[:, i]), alg)
+        (params_points[:, i], energies_points[i]) = sol.u, sol.objective
+    end
     
-#     (Einit, index) = findmin(energies_points)
-#     Γ = Vector(params_points[:, index])
-#     toFundamentalRegion!(qaoa, Γ)
+    (Einit, index) = findmin(energies_points)
+    Γ = Vector(params_points[:, index])
+    toFundamentalRegion!(qaoa, Γ)
 
-#     return Γ, Einit
-# end
+    return Γ, Einit
+end

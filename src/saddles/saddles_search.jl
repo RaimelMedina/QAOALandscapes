@@ -167,11 +167,11 @@ end
 
 
 function modulatedNewton(
-    qaoa::QAOA{C, P, H, M}, 
+    qaoa::QAOA, 
     Γ0::Vector{T},
     niter::Int=1_000; 
     verbose=false
-    ) where {C <: ClassicalCost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:AbstractFloat}
+    ) where {T<:AbstractFloat}
     
     Γ = similar(Γ0)
     Γ .= Γ0 

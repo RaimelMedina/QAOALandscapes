@@ -1,5 +1,3 @@
-
-
 function (init::InterpInitialization)(Γ::Vector{T}) where T<:Real
     p = length(Γ) ÷ 2
     β = @view Γ[2:2:2p]

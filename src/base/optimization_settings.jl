@@ -1,60 +1,138 @@
+# Specialization for ExactMethod
 function construct_optimization_function(
-    qaoa::QAOA{C, ExactMethod, P, H, M},
-    adtype::T
-    ) where {C<:AbstractQAOACost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:SciMLBase.NoAD}
-    
+    qaoa::QAOA{C, ExactMethod}; 
+    adtype=SciMLBase.NoAD()
+    ) where {C}
     gradTape = GradientTape(qaoa)
-    f_qaoa(u, p=nothing) = qaoa(u)
-    grad_qaoa(G, u, p=nothing) = gradient!(G, qaoa, gradTape, u)
-    return OptimizationFunction(f_qaoa, adtype; grad=grad_qaoa)
+    f(u, p=nothing) = qaoa(u)
+    grad(G, u, p=nothing) = gradient!(G, qaoa, gradTape, u)
+    return OptimizationFunction(f, adtype; grad=grad)
 end
 
+# Specialization for SamplingMethod
 function construct_optimization_function(
-    qaoa::QAOA{C, ExactMethod, P, H, M},
-    adtype::T
-    ) where {C<:AbstractQAOACost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Union{AutoEnzyme, AutoForwardDiff}}
-    f_qaoa(u, p=nothing) = qaoa(u)
-    return OptimizationFunction(f_qaoa, adtype)
-end
-
-function construct_optimization_function(
-    qaoa::QAOA{C, SamplingMethod, P, H, M},
-    adtype::T,
-    average_samples::Int=20
-    ) where {C<:AbstractQAOACost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Union{SciMLBase.NoAD, AutoFiniteDiff}}
-
-    f_qaoa(u, p=nothing) = mean(qaoa(u) for _ in 1:average_samples)
-    return OptimizationFunction(f_qaoa, adtype)
+    qaoa::QAOA{C, SamplingMethod}; 
+    adtype=SciMLBase.NoAD(), 
+    average_samples=20
+    ) where {C<:Any}
+    T = qaoa.problem |> eltype
+    function f(u, p=nothing)
+        sum = zero(T)
+        for _ in 1:average_samples
+            sum += qaoa(u)
+        end
+        return sum / average_samples
+    end
+    return OptimizationFunction(f, adtype)
 end
 
 function construct_optimization_problem(
-    qaoa::QAOA{C, ExactMethod, P, H, M}, 
-    Γ::AbstractVector{S}, 
-    adtype::T; 
+    qaoa::QAOA{C, E}, 
+    Γ::Vector{S}, 
+    adtype=SciMLBase.NoAD(); 
     lb=nothing, 
     ub=nothing, 
+    average_samples=nothing, 
     kwargs...
-    ) where {C<:AbstractQAOACost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, S, T<:Union{SciMLBase.NoAD, AutoEnzyme, AutoForwardDiff}}
-    
-    opt_fun = construct_optimization_function(qaoa, adtype)
-    opt_prob = OptimizationProblem(opt_fun, Γ; lb=lb, ub=ub, kwargs...)
-    return opt_prob
+) where {C<:Any, E<:ExpectationMethod, S}
+    opt_fun = isnothing(average_samples) ? 
+              construct_optimization_function(qaoa; adtype) : 
+              construct_optimization_function(qaoa; adtype, average_samples)
+    return OptimizationProblem(opt_fun, Γ; lb=lb, ub=ub, kwargs...)
 end
 
-function construct_optimization_problem(
-    qaoa::QAOA{C, SamplingMethod, P, H, M}, 
-    Γ::AbstractVector{S}, 
-    adtype::T,
-    average_samples::Int=20;
-    lb=nothing, 
-    ub=nothing, 
-    kwargs...
-    ) where {C<:AbstractQAOACost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, S, T<:Union{SciMLBase.NoAD, AutoFiniteDiff}}
+function optimizeParameters(qaoa::QAOA, 
+    param::Vector{T},
+    alg,
+    args...;
+    adtype=SciMLBase.NoAD(),
+    kwargs...) where {T<:Real}
     
-    opt_fun = construct_optimization_function(qaoa, adtype, average_samples)
-    opt_prob = OptimizationProblem{true}(opt_fun, Γ; lb=lb, ub=ub, kwargs...)
-    return opt_prob
+    opt_prob = construct_optimization_problem(qaoa, param, adtype)
+    return solve(opt_prob, alg, args...; kwargs...)
 end
+
+
+
+# # Specialized for ExactMethod
+# function construct_optimization_problem(
+#     qaoa::QAOA{C, ExactMethod}, 
+#     Γ::Vector{S}, 
+#     adtype=SciMLBase.NoAD(); 
+#     kwargs...
+# ) where {C, S}
+#     construct_optimization_problem(qaoa, Γ, adtype; kwargs...)
+# end
+
+# # Specialized for SamplingMethod
+# function construct_optimization_problem(
+#     qaoa::QAOA{C, SamplingMethod}, 
+#     Γ::Vector{S}, 
+#     adtype=SciMLBase.NoAD(); 
+#     average_samples=20, 
+#     kwargs...
+# ) where {C, S}
+#     construct_optimization_problem(qaoa, Γ, adtype; average_samples, kwargs...)
+# end
+
+
+# function construct_optimization_function(
+#     qaoa::QAOA{C, ExactMethod, P, H, M},
+#     adtype::T
+#     ) where {C<:AbstractQAOACost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:SciMLBase.NoAD}
+    
+#     gradTape = GradientTape(qaoa)
+#     f_qaoa(u, p=nothing) = qaoa(u)
+#     grad_qaoa(G, u, p=nothing) = gradient!(G, qaoa, gradTape, u)
+#     return OptimizationFunction(f_qaoa, adtype; grad=grad_qaoa)
+# end
+
+# function construct_optimization_function(
+#     qaoa::QAOA{C, ExactMethod, P, H, M},
+#     adtype::T
+#     ) where {C<:AbstractQAOACost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Union{AutoEnzyme, AutoForwardDiff}}
+#     f_qaoa(u, p=nothing) = qaoa(u)
+#     return OptimizationFunction(f_qaoa, adtype)
+# end
+
+# function construct_optimization_function(
+#     qaoa::QAOA{C, SamplingMethod, P, H, M},
+#     adtype::T,
+#     average_samples::Int=20
+#     ) where {C<:AbstractQAOACost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T<:Union{SciMLBase.NoAD, AutoFiniteDiff}}
+
+#     f_qaoa(u, p=nothing) = mean(qaoa(u) for _ in 1:average_samples)
+#     return OptimizationFunction(f_qaoa, adtype)
+# end
+
+# function construct_optimization_problem(
+#     qaoa::QAOA{C, ExactMethod, P, H, M}, 
+#     Γ::AbstractVector{S}, 
+#     adtype::T; 
+#     lb=nothing, 
+#     ub=nothing, 
+#     kwargs...
+#     ) where {C<:AbstractQAOACost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, S, T<:Union{SciMLBase.NoAD, AutoEnzyme, AutoForwardDiff}}
+    
+#     opt_fun = construct_optimization_function(qaoa, adtype)
+#     opt_prob = OptimizationProblem(opt_fun, Γ; lb=lb, ub=ub, kwargs...)
+#     return opt_prob
+# end
+
+# function construct_optimization_problem(
+#     qaoa::QAOA{C, SamplingMethod, P, H, M}, 
+#     Γ::AbstractVector{S}, 
+#     adtype::T,
+#     average_samples::Int=20;
+#     lb=nothing, 
+#     ub=nothing, 
+#     kwargs...
+#     ) where {C<:AbstractQAOACost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, S, T<:Union{SciMLBase.NoAD, AutoFiniteDiff}}
+    
+#     opt_fun = construct_optimization_function(qaoa, adtype, average_samples)
+#     opt_prob = OptimizationProblem{true}(opt_fun, Γ; lb=lb, ub=ub, kwargs...)
+#     return opt_prob
+# end
 
 
 # struct OptSetup{T<:Optim.AbstractOptimizer}
@@ -107,15 +185,6 @@ end
 # result = optimizeParameters(qaoa, params, method=Optim.BFGS(linesearch=Optim.HagerZhang()), printout=true)
 # ```
 # """
-function optimizeParameters(qaoa::QAOA, 
-    param::Vector{T},
-    alg,
-    args...;
-    kwargs...) where {T<:Real}
-    
-    opt_prob = construct_optimization_problem(qaoa, param, AutoEnzyme())
-    return solve(opt_prob, alg, args...; kwargs...)
-end
 
 
 # function optimizeParameters(qaoa::QAOA, 

@@ -103,15 +103,24 @@ function rollDown(qaoa::QAOA,
 
     ΓTs = TSInitialization(Γmin, ig, tsType)
     umin = getNegativeHessianEigvec(qaoa, Γmin, ig, tsType=tsType)["eigvec_approx"] |> Array
-    
+    if any(isnan, umin)
+        println("WARNING: NaN in umin at ig=$ig, tsType=$tsType")
+    end
+
     Γ0_p = ΓTs + init.ϵ*umin
     Γ0_m = ΓTs - init.ϵ*umin
     
     solutions = [optimizeParameters(qaoa, x, alg) for x in [Γ0_p, Γ0_m]]
-    
+    energies = map(x->getproperty(x, :objective), solutions)
+    params = map(x->getproperty(x, :u), solutions)
+
+    if any(isnan, energies)
+        println("WARNING: NaN in energies at ig=$ig, tsType=$tsType")
+    end
+
     return TSResult(
-        reduce(hcat, map(x->getproperty(x, :u), solutions)), 
-        map(x->getproperty(x, :objective), solutions),
+        reduce(hcat, params), 
+        energies,
         ig,
         tsType
     )

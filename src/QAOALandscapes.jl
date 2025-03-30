@@ -99,10 +99,6 @@ struct TSResult{T<:Real, S<:Val}
     end
 end
 
-# using Requires
-# function __init__()
-#     @require Metal="dde4c033-4e86-420c-a63e-0dd931031962" include(joinpath("base", "gpu.jl"))
-# end
 
 using Revise
 using GPUArrays
@@ -139,7 +135,7 @@ include(joinpath("base", "gradient.jl"))
 include(joinpath("base", "layers.jl"))
 include(joinpath("base", "optimization_settings.jl"))
 include(joinpath("base", "parameters.jl"))
-include(joinpath("base", "metal.jl"))
+# include(joinpath("base", "metal.jl"))
 
 
 # inside /classical

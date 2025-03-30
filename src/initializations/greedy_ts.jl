@@ -1,9 +1,7 @@
 function greedySelect(results::Vector{TSResult{T}}) where T
     min_ts = argmin(result -> minimum(result.energies), results)
-    # Get index of minimum energy in the winning TSResult
     min_energy_idx = argmin(min_ts.energies)
-    # Return both the TSResult and the corresponding parameter column
-    return  min_ts.params[:, min_energy_idx], min_ts.energies[min_energy_idx]
+    return min_ts.params[:, min_energy_idx], min_ts.energies[min_energy_idx]
 end
 
 function optimizeWithGreedy(qaoa::QAOA, 

@@ -10,7 +10,7 @@ QAOALandscapes is a Julia package for exactly simulating the QAOA algorithm for 
 - Interpolation (Interp) strategy.
 - Fourier strategy.
 
-In terms of optimization, we currently support all the methods available through [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/). The computation of the cost function/energy gradient is done using the **adjoint differentiation method** from this very nice paper [*Efficient calculation of gradients in classical simulations of variational quantum algorithms*](https://arxiv.org/abs/2009.02823).
+In terms of optimization, we currently use the [`Optimization.jl`](https://github.com/SciML/Optimization.jl) interface with default optimizers from `OptimizationOptimJL`. The computation of the cost function/energy gradient is done using the **adjoint differentiation method** from this very nice paper [*Efficient calculation of gradients in classical simulations of variational quantum algorithms*](https://arxiv.org/abs/2009.02823).
 
 ## Installation
 
@@ -33,7 +33,7 @@ g    = random_regular_graph(n, d) # 3-regular unweighted graph
 prob = ClassicalProblem(Float64, g)
 
 qaoa = QAOA(prob) # if the problem is Z2 symmetric then the algorithm will work in the correct Hilbert subspace
-init_point, init_energy = getInitialParameter(qaoa) # obtain initial parameters at p=1
+init_point, init_energy = getInitialParameter(qaoa) # obtain initial parameters at p=1 (defaults to BFGS)
 
 # Now choose a strategy
 # For example, for transition states we have implemented the Greedy strategy
@@ -42,17 +42,16 @@ greedyData = greedyOptimize(qaoa, init_point, pmax);
 # If you prefer INTERP strategy
 interpData = interpOptimize(qaoa, init_point, pmax);
 
-# Alternatively, you can also optimize a given set of parameters
-# directly
+# Alternatively, you can also optimize a given set of parameters directly
 initial_parameter = rand(20)
 optimal_param, optimal_energy = optimizeParameters(qaoa, initial_parameter)
 ```
 
 # Documentation
-Right now is not working but I'm working on that and it should be fixed soon.
+Documentation is a work in progress; the dev docs link above reflects the most recent updates.
 
 # GPU
-As of now, I don't know how to setup the package so that it automatically detects which GPU (if any) the user has. So for now, I recommend that after downloading the package you build it again by including the `gpu.jl` file and add the correspoding GPU package, i.e., `CUDA.jl` or `Metal.jl`. I plan to add support to AMD devices via `KernelAbstractions.jl` but that will come later
+Metal support is included but only enabled when `Metal.jl` is available. The CPU backend remains the default. CUDA support is not wired yet, but is planned alongside broader `KernelAbstractions.jl` support.
 
 ## Warning
 This is a work in progress and the code is very very rudimentary. I hope in this would be in a decent state to share sometime in the future. 

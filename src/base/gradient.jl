@@ -19,7 +19,7 @@ end
 function gradient!(G::Vector{T}, qaoa::QAOA{C, ExactMethod, P, H, M}, gradTape::GradientTape{H}, params::Vector{T}
     ) where {C<:ClassicalCost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T}
     # this will update/populate qaoa.state which we will call |λ⟩ following the paper
-    getQAOAState(qaoa, params, gradTape.λ)
+    getQAOAState!(qaoa, params, gradTape.λ)
     
     # |ϕ⟩ := |λ⟩
     gradTape.ϕ .= gradTape.λ
@@ -61,7 +61,7 @@ function gradient!(
     ) where {C<:QuantumCost, P<:AbstractProblem, H<:AbstractVector, M<:AbstractMixer, T, }
     
     # this will update/populate qaoa.state which we will call |λ⟩ following the paper
-    getQAOAState(qaoa, params, gradTape.λ)
+    getQAOAState!(qaoa, params, gradTape.λ)
     λ_hx = copy(gradTape.λ)
     
     # |ϕ⟩ := |λ⟩

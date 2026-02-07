@@ -34,7 +34,6 @@ function regularQ(cp::ClassicalProblem{R}) where R <: Real
         end
     end
     term_degrees = sum(adjmat, dims=2)
-    println(adjmat)
     if allequal(term_degrees)
         return term_degrees[1]
     else
@@ -106,13 +105,13 @@ function ClassicalProblem(g::SimpleWeightedGraph{<:Int, T}) where T<:Real
 end
 
 function ClassicalProblem(terms::Dict{Vector{Int}, T}, n::Int) where T<:Real
-    isWeigted = !all(abs.(values(terms)) .== T(1))
+    isWeighted = !all(abs.(values(terms)) .== T(1))
     return ClassicalProblem{T}(
         terms, 
         n, 
         locality(terms), 
         regularQ(terms, n), 
-        isWeigted
+        isWeighted
     )
 end
 

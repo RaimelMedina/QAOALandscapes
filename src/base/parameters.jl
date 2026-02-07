@@ -1,23 +1,23 @@
-# mutable struct Parameter{T<:Real} <: AbstractVector{T}
-#     value::T
-#     data::Vector{T}
-# end
+mutable struct Parameter{T<:Real} <: AbstractVector{T}
+    value::T
+    data::Vector{T}
+end
 
-# Base.getindex(p::Parameter, i::Int) = p.data[i]
-# Base.size(p::Parameter) = size(p.data)
-# Base.length(p::Parameter) = length(p.data)
-# Base.setindex!(p::Parameter{T}, v::T, i::Int) where T<:Real = (p.data[i]=v)
+Base.getindex(p::Parameter, i::Int) = p.data[i]
+Base.size(p::Parameter) = size(p.data)
+Base.length(p::Parameter) = length(p.data)
+Base.setindex!(p::Parameter{T}, v::T, i::Int) where T<:Real = (p.data[i] = v)
 
-# function setvalue!(param::Parameter{T}, qaoa::QAOA{P, H, M}) where {P, H, M, T<:Real}
-#     param.value = qaoa(param)
-# end
-# function setvalue!(param::Parameter{T}, val::T) where T<:Real
-#     param.value = val
-# end
+function setvalue!(param::Parameter{T}, qaoa::QAOA) where {T<:Real}
+    param.value = qaoa(param.data)
+end
+function setvalue!(param::Parameter{T}, val::T) where T<:Real
+    param.value = val
+end
 
-# Parameter(vec::Vector{T}) where T<:Real = Parameter(T(0), vec)
+Parameter(vec::Vector{T}) where T<:Real = Parameter(T(0), vec)
 
-# (qaoa::QAOA{P, H, M})(param::Parameter{T}) where {P, H, M, T<:Real} = qaoa(param.data)
+(qaoa::QAOA)(param::Parameter{T}) where {T<:Real} = qaoa(param.data)
 
 
 @doc raw"""

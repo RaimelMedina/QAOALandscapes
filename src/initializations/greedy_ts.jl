@@ -47,9 +47,9 @@ function optimizeWithStrategy(qaoa::QAOA,
     @assert p < pmax
 
     energies_optima = zeros(T, pmax-p)
-    params_optima= Vector{T}(undef, pmax-p)
+    params_optima = Vector{Vector{T}}(undef, pmax-p)
 
-    push!(params_optima, Γ0)
+    params_optima[1] = Γ0
     energies_optima[1] = qaoa(Γ0)
 
     iter = Progress(pmax-p; desc="Optimizing QAOA energy...")
@@ -58,12 +58,15 @@ function optimizeWithStrategy(qaoa::QAOA,
         result = rollDown(qaoa, params_optima[t-1], gamma_index, tsType, init, alg)
         min_energy_index = argmin(result.energies)
 
-        energies_optima[t] = result.energies[min_energy_index]
-        push!(params_optima, result.params[:, min_energy_index])
+        Eopt = result.energies[min_energy_index]
+        Γopt = result.params[:, min_energy_index]
+
+        energies_optima[t] = Eopt
+        params_optima[t] = Γopt
 
         next!(iter; showvalues = [(:Circuit_depth, t), (:Energy, Eopt)])
     end
-    return Eopt, Γopt
+    return energies_optima, params_optima
 end
 
 

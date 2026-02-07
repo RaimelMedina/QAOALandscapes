@@ -23,6 +23,7 @@ struct QAOA{C<:AbstractQAOACost, E<:ExpectationMethod, K<:AbstractProblem, T<:Ab
     problem::K
     HC::T
     mixer::M
+    initial_state::T
     nshots::Union{Int, Nothing}  # Only used when E <: SamplingMethod
 end
 
@@ -40,16 +41,20 @@ Construct a QAOA instance for a classical problem using exact expectation value 
 function QAOA(cp::ClassicalProblem{R}) where {R<:Real}
     mixer = XMixer(cp.n)
     ham = hamiltonian(cp)
+    initial_state = similar(ham)
+    initial_state .= Complex{R}(1 / sqrt(length(ham)))
     T = typeof(ham)
     M = typeof(mixer)
     K = typeof(cp)
-    return QAOA{ClassicalCost, ExactMethod, K, T, M}(cp.n, cp, ham, mixer, nothing)
+    return QAOA{ClassicalCost, ExactMethod, K, T, M}(cp.n, cp, ham, mixer, initial_state, nothing)
 end
 
 function QAOA(cp::ClassicalProblem{R}, ham::S) where {R<:Real, S<:AbstractGPUArray{Complex{R}}}
     mixer = XMixer(cp.n)
+    initial_state = similar(ham)
+    initial_state .= Complex{R}(1 / sqrt(length(ham)))
     K = typeof(cp)
-    return QAOA{ClassicalCost, ExactMethod, K, S, typeof(mixer)}(cp.n, cp, ham, mixer, nothing)
+    return QAOA{ClassicalCost, ExactMethod, K, S, typeof(mixer)}(cp.n, cp, ham, mixer, initial_state, nothing)
 end
 
 @doc raw"""
@@ -67,12 +72,14 @@ Construct a QAOA instance for a given cost type using shot-based measurements.
 function QAOA(cp::ClassicalProblem{R}, nshots::Int) where {R<:Real}
     mixer = XMixer(cp.n)
     ham = hamiltonian(cp)
+    initial_state = similar(ham)
+    initial_state .= Complex{R}(1 / sqrt(length(ham)))
 
     T = typeof(ham)
     M = typeof(mixer)
     K = typeof(cp)
     
-    return QAOA{ClassicalCost, SamplingMethod, K, T, M}(cp.n, cp, ham, mixer, nshots)
+    return QAOA{ClassicalCost, SamplingMethod, K, T, M}(cp.n, cp, ham, mixer, initial_state, nshots)
 end
 
 # Show method
@@ -103,11 +110,7 @@ with
 and ``H_B, H_C`` corresponding to the mixing and cost Hamiltonian respectively.
 """
 function getQAOAState(q::QAOA, Γ::AbstractVector{T}) where T<:Real
-    dim = length(q.HC)
-
-    ψ::AbstractVector{Complex{T}} = similar(q.HC)
-    ψ .= Complex{T}(1/sqrt(dim))
-    
+    ψ = copy(q.initial_state)
     for i in eachindex(Γ)
         applyQAOALayer!(q, Γ[i], i, ψ)
     end
@@ -131,9 +134,16 @@ and ``H_B, H_C`` corresponding to the mixing and cost Hamiltonian respectively.
 function getQAOAState(q::QAOA, Γ::AbstractVector{T}, ψ0::H) where {H, T<:Real}
     dim = length(q.HC)
     @assert dim == length(ψ0)
+    ψ = copy(ψ0)
+    for i in eachindex(Γ)
+        applyQAOALayer!(q, Γ[i], i, ψ)
+    end
+    return ψ
+end
 
-    ψ0 .= Complex{T}(1/sqrt(dim))
-    
+function getQAOAState!(q::QAOA, Γ::AbstractVector{T}, ψ0::AbstractVector{Complex{T}}) where {T<:Real}
+    dim = length(q.HC)
+    @assert dim == length(ψ0)
     for i in eachindex(Γ)
         applyQAOALayer!(q, Γ[i], i, ψ0)
     end

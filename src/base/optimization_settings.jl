@@ -52,6 +52,32 @@ function optimizeParameters(qaoa::QAOA,
     return solve(opt_prob, alg, args...; kwargs...)
 end
 
+function optimizeParameters(
+    qaoa::QAOA,
+    param::Vector{T};
+    alg=OptimizationOptimJL.BFGS(),
+    adtype=SciMLBase.NoAD(),
+    kwargs...
+) where {T<:Real}
+    return optimizeParameters(qaoa, param, alg; adtype=adtype, kwargs...)
+end
+
+function optimizeParameters(
+    ::Val{:Fourier},
+    qaoa::QAOA,
+    params::Vector{T};
+    alg=OptimizationOptimJL.BFGS(),
+    adtype=SciMLBase.NoAD(),
+    kwargs...
+) where {T<:Real}
+    f(u, p=nothing) = qaoa(fromFourierParams(u))
+    grad(G, u, p=nothing) = (G .= gradCostFunctionFourier(qaoa, u))
+    opt_fun = OptimizationFunction(f, adtype; grad=grad)
+    opt_prob = OptimizationProblem(opt_fun, params)
+    sol = solve(opt_prob, alg; kwargs...)
+    return fromFourierParams(sol.u), sol.objective
+end
+
 
 
 # # Specialized for ExactMethod
@@ -424,7 +450,6 @@ function getInitialParameter(qaoa::QAOA,
     )
     
     T = qaoa.problem |> eltype
-    @info T
     initial_points = rand(T, 2, num_points)*2π
     energies_points = zeros(T, num_points)
     params_points  = zeros(T, 2, num_points)
@@ -439,4 +464,12 @@ function getInitialParameter(qaoa::QAOA,
     toFundamentalRegion!(qaoa, Γ)
 
     return Γ, Einit
+end
+
+function getInitialParameter(
+    qaoa::QAOA;
+    alg=OptimizationOptimJL.BFGS(),
+    num_points::Int=20
+)
+    return getInitialParameter(qaoa, alg, num_points)
 end

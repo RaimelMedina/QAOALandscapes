@@ -4,22 +4,22 @@ const MAX_THREADS = 1024
 
 # Functions related to an arbitrary QAOA
 export ClassicalProblem, hamiltonian, XMixer, AbstractProblem, AbstractMixer 
-export QAOA, getQAOAState, gradCostFunction, hessianCostFunction, geometricTensor
+export QAOA, getQAOAState, getQAOAState!, gradCostFunction, hessianCostFunction, geometricTensor
 export rollDown, optimizeParametersSlice, optimizeWithStrategy
 export plus_state, getInitialParameter, toFundamentalRegion!
 # Functions related to different initialization strategies
 # Interp
 export InterpInitialization
 # Fourier
-# export toFourierParams, fromFourierParams, fourierInitialization, fourierJacobian, rollDownFourier, fourierOptimize
+export toFourierParams, fromFourierParams, fourierInitialization, fourierJacobian, rollDownFourier, fourierOptimize
 # Transition states
 export TSInitialization, permuteHessian, getNegativeHessianEigval, getNegativeHessianEigvec, rollDownfromTS, rollDownTS, greedyOptimize, greedySelect, getHessianIndex
 # General stationary points
 export getStationaryPoints, gradSquaredNorm, optimizeGradSquaredNorm, gad
 export modulatedNewton, warmOptimizeModulatedNewton
-export QAOAData
-export Node, IdNodes, constructOptimizationGraph
+export Experimental
 export TaylorTermsTS, Oϵ_ψ0, ψT2, ψT4, ψHC2
+export Experimental
 
 # Some useful Functions
 export goemansWilliamson
@@ -102,7 +102,12 @@ end
 
 using Revise
 using GPUArrays
-using Metal
+const HAS_METAL = try
+    @eval using Metal
+    true
+catch
+    false
+end
 using SparseArrays
 using Graphs
 using ForwardDiff
@@ -111,6 +116,7 @@ using AbstractTrees
 using ProgressMeter
 using SimpleWeightedGraphs
 using Optimization
+using OptimizationOptimJL
 using LineSearches
 using LinearAlgebra
 using ThreadsX
@@ -122,6 +128,8 @@ using Base.Threads
 using Combinatorics
 using Convex
 using SCS
+using Interpolations
+using QuadGK
 
 function setRandomSeed(seed::Int)
     Random.seed!(seed)
@@ -135,18 +143,19 @@ include(joinpath("base", "gradient.jl"))
 include(joinpath("base", "layers.jl"))
 include(joinpath("base", "optimization_settings.jl"))
 include(joinpath("base", "parameters.jl"))
-# include(joinpath("base", "metal.jl"))
+if HAS_METAL
+    include(joinpath("base", "metal.jl"))
+end
 
 
 # inside /classical
 include(joinpath("classical", "maxcut.jl"))
 
 # inside /experimental
-# include(joinpath("experimental", "data_wrapper.jl"))
-include(joinpath("experimental", "experimental.jl"))
+include(joinpath("experimental", "Experimental.jl"))
 
 # inside /initializations
-# include(joinpath("initializations", "fourier.jl"))
+include(joinpath("initializations", "fourier.jl"))
 include(joinpath("initializations", "interp.jl"))
 include(joinpath("initializations", "greedy_ts.jl"))
 include(joinpath("initializations", "transition_states.jl"))
@@ -156,8 +165,8 @@ include(joinpath("initializations", "hessian_tools.jl"))
 include(joinpath("saddles", "saddles_search.jl"))
 
 # inside /utilities
-# include(joinpath("utilities", "utils.jl"))
-# include(joinpath("utilities", "state_utilities.jl"))
+include(joinpath("utilities", "utils.jl"))
+include(joinpath("utilities", "state_utilities.jl"))
 include("test_instances.jl")
 
 end

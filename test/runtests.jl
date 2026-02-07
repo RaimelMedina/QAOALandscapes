@@ -64,3 +64,7 @@ end
     Γ_fourier = fourierInitialization(Γ)
     @test length(Γ_fourier) == length(Γ) + 2
 end
+
+@testset "GPU backend selection" begin
+    @test gpu_backend() in (:cpu, :metal, :cuda)
+end

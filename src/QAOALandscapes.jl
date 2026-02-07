@@ -28,6 +28,7 @@ export harvardGraph
 export labs_hamiltonian
 
 export xorsat_dict
+export gpu_backend
 
 abstract type AbstractQAOACost end
 abstract type QuantumCost <: AbstractQAOACost end
@@ -104,7 +105,21 @@ using Revise
 using GPUArrays
 const HAS_METAL = try
     @eval using Metal
-    true
+    try
+        Metal.functional()
+    catch
+        true
+    end
+catch
+    false
+end
+const HAS_CUDA = try
+    @eval using CUDA
+    try
+        CUDA.functional()
+    catch
+        true
+    end
 catch
     false
 end
@@ -143,7 +158,24 @@ include(joinpath("base", "gradient.jl"))
 include(joinpath("base", "layers.jl"))
 include(joinpath("base", "optimization_settings.jl"))
 include(joinpath("base", "parameters.jl"))
-if HAS_METAL
+const GPU_BACKEND = let
+    preferred = lowercase(get(ENV, "QAOA_GPU", ""))
+    if preferred == "cuda"
+        HAS_CUDA || error("QAOA_GPU=cuda requested but CUDA is unavailable")
+        :cuda
+    elseif preferred == "metal"
+        HAS_METAL || error("QAOA_GPU=metal requested but Metal is unavailable")
+        :metal
+    else
+        HAS_CUDA ? :cuda : (HAS_METAL ? :metal : :cpu)
+    end
+end
+
+gpu_backend() = GPU_BACKEND
+
+if GPU_BACKEND == :cuda
+    include(joinpath("base", "gpu.jl"))
+elseif GPU_BACKEND == :metal
     include(joinpath("base", "metal.jl"))
 end
 

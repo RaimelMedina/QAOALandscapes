@@ -1,6 +1,6 @@
 function kernelExpX!(psi, bitmask::Int, cos_a::K, sin_a::K) where {K}
     index = (threadIdx().x + (blockIdx().x - 1) * blockDim().x) - 1
-    if index & bitmask == 0
+    if index < length(psi) && index & bitmask == 0
         i1 = index + 1
         i2 = index + 1 + bitmask
 
@@ -16,6 +16,9 @@ end
 
 function kernelExpXParity!(psi, dim::Int, cβ::K, sβ::K) where {K}
     i = (threadIdx().x + (blockIdx().x - 1) * blockDim().x)
+    if i > dim
+        return
+    end
     val1 = psi[i]
     val2 = psi[dim-i+1]
 
@@ -38,6 +41,9 @@ end
 
 function kernelExpHC!(hc, ψ, γ::R) where {R}
     i = (threadIdx().x + (blockIdx().x - 1) * blockDim().x)
+    if i > length(ψ)
+        return
+    end
     ψ[i] *= exp(-im * γ * hc[i])
     return
 end
@@ -55,6 +61,9 @@ end
 
 function kernelHCψ!(hc, psi)
     i = (threadIdx().x + (blockIdx().x - 1) * blockDim().x)
+    if i > length(psi)
+        return nothing
+    end
     psi[i] *= hc[i]
     return nothing
 end
@@ -73,6 +82,9 @@ end
 #### kernels for HB|ψ⟩ ####
 function kernel_x_mixer!(psi::T, bitmask::Int, result::T) where T<:AbstractGPUVector
     index = (threadIdx().x + (blockIdx().x - 1) * blockDim().x) - 1
+    if index < 0 || index >= length(psi)
+        return nothing
+    end
     i1 = index + 1
     if index & bitmask == 0
         i2 = index + 1 + bitmask
@@ -85,6 +97,9 @@ end
 
 function kernel_x_mixer_parity!(psi, dim::Int, result)
     i = (threadIdx().x + (blockIdx().x - 1) * blockDim().x)
+    if i > dim
+        return
+    end
     psi[i]       += result[dim-i+1]
     psi[dim-i+1] += result[i]
     

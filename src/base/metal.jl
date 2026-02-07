@@ -28,8 +28,9 @@ end
 function applyExpX!(psi::T, k::Int, cos_a::K, sin_a::K) where {T<:AbstractGPUVector,K}
     dim = length(psi)
     bitmask = 1 << (k-1)
-    num_groups = dim ÷ MAX_THREADS
-    @metal threads=MAX_THREADS groups=num_groups kernelExpX!(psi, bitmask, cos_a, sin_a)
+    threads = min(MAX_THREADS, dim)
+    num_groups = cld(dim, threads)
+    @metal threads=threads groups=num_groups kernelExpX!(psi, bitmask, cos_a, sin_a)
     return nothing
 end
 
@@ -41,8 +42,9 @@ end
 
 function applyExpLayer!(hc::T, ψ::K, γ::R) where {T<:AbstractGPUVector, K<:AbstractGPUVector, R}
     dim = length(ψ)
-    num_groups = dim ÷ MAX_THREADS
-    @metal threads=MAX_THREADS groups=num_groups kernelExpHC!(hc, ψ, γ)
+    threads = min(MAX_THREADS, dim)
+    num_groups = cld(dim, threads)
+    @metal threads=threads groups=num_groups kernelExpHC!(hc, ψ, γ)
     return nothing
 end
 
@@ -56,9 +58,10 @@ end
 
 function Hc_ψ!(ham::S, ψ::T) where {S<:AbstractGPUVector, T<:AbstractGPUVector}
     dim = length(ψ)
-    num_groups = dim ÷ MAX_THREADS
+    threads = min(MAX_THREADS, dim)
+    num_groups = cld(dim, threads)
 
-    @metal threads=MAX_THREADS groups=num_groups kernelHCψ!(ham, ψ)
+    @metal threads=threads groups=num_groups kernelHCψ!(ham, ψ)
     return nothing
 end
 
@@ -89,17 +92,18 @@ function (hamX::XMixer)(ψ::T, temp_ψ::T) where T <: AbstractGPUVector
     N = dim |> log2 |> Int
     @assert N == hamX.N || N + 1 == hamX.N
 
-    num_groups = dim ÷ MAX_THREADS
-    num_groups_parity = (dim ÷ 2) ÷ MAX_THREADS
+    threads = min(MAX_THREADS, dim)
+    num_groups = cld(dim, threads)
+    num_groups_parity = cld(dim ÷ 2, threads)
     
     #temp_ψ::MtlVector{T} = copy(ψ)
 
     for qubit in 1:N
         mask = 1 << (qubit - 1)
-        @metal threads=MAX_THREADS groups=num_groups kernel_x_mixer!(ψ, mask, temp_ψ)
+        @metal threads=threads groups=num_groups kernel_x_mixer!(ψ, mask, temp_ψ)
     end
     if N+1 == hamX.N
-        @metal threads=MAX_THREADS groups=num_groups_parity kernel_x_mixer_parity!(ψ, dim, temp_ψ)
+        @metal threads=threads groups=num_groups_parity kernel_x_mixer_parity!(ψ, dim, temp_ψ)
     end
     return nothing
 end
@@ -109,17 +113,18 @@ function (hamX::XMixer)(ψ::T) where T <: AbstractGPUVector
     N = dim |> log2 |> Int
     @assert N == hamX.N || N + 1 == hamX.N
 
-    num_groups = dim ÷ MAX_THREADS
-    num_groups_parity = (dim ÷ 2) ÷ MAX_THREADS
+    threads = min(MAX_THREADS, dim)
+    num_groups = cld(dim, threads)
+    num_groups_parity = cld(dim ÷ 2, threads)
     
     temp_ψ = copy(ψ)
 
     for qubit in 1:N
         mask = 1 << (qubit - 1)
-        @metal threads=MAX_THREADS groups=num_groups kernel_x_mixer!(ψ, mask, temp_ψ)
+        @metal threads=threads groups=num_groups kernel_x_mixer!(ψ, mask, temp_ψ)
     end
     if N+1 == hamX.N
-        @metal threads=MAX_THREADS groups=num_groups_parity kernel_x_mixer_parity!(ψ, dim, temp_ψ)
+        @metal threads=threads groups=num_groups_parity kernel_x_mixer_parity!(ψ, dim, temp_ψ)
     end
     return nothing
 end
@@ -131,7 +136,8 @@ function applyExpLayer!(mixer::XMixer, psi::T, β::R) where {T<:AbstractGPUVecto
     dim = length(psi)
     N = Int(log2(dim))
     
-    num_groups_parity = (dim ÷ 2) ÷ MAX_THREADS
+    threads = min(MAX_THREADS, dim)
+    num_groups_parity = cld(dim ÷ 2, threads)
 
     # Loop over spins
     for i ∈ 1:N
@@ -139,7 +145,7 @@ function applyExpLayer!(mixer::XMixer, psi::T, β::R) where {T<:AbstractGPUVecto
     end
     # check if there is parity symmetry
     if N+1 == mixer.N # Z2 symmetric case
-        @metal threads=MAX_THREADS groups=num_groups_parity kernelExpXParity!(psi, dim, cβ, sβ)
+        @metal threads=threads groups=num_groups_parity kernelExpXParity!(psi, dim, cβ, sβ)
     end
     return nothing
 end

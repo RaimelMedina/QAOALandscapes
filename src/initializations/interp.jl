@@ -2,13 +2,24 @@ function (init::InterpInitialization)(Γ::Vector{T}) where T<:Real
     p = length(Γ) ÷ 2
     β = @view Γ[2:2:2p]
     γ = @view Γ[1:2:2p]
-    
-    βNew = map(x->((x-1)/p)*(x==1 ? 0 : β[x-1]) + ((p-x+1)/p)*(x==p+1 ? 0 : β[x]), 1:p+1)
-    γNew = map(x->((x-1)/p)*(x==1 ? 0 : γ[x-1]) + ((p-x+1)/p)*(x==p+1 ? 0 : γ[x]), 1:p+1)
 
-    ΓNew = zeros(T, 2*(p+1))
-    ΓNew[2:2:2(p+1)] = βNew
-    ΓNew[1:2:2(p+1)] = γNew
+    βNew = Vector{T}(undef, p + 1)
+    γNew = Vector{T}(undef, p + 1)
+
+    @inbounds for x in 1:(p + 1)
+        left_weight = (x - 1) / p
+        right_weight = (p - x + 1) / p
+        βNew[x] = left_weight * (x == 1 ? zero(T) : β[x - 1]) +
+                  right_weight * (x == p + 1 ? zero(T) : β[x])
+        γNew[x] = left_weight * (x == 1 ? zero(T) : γ[x - 1]) +
+                  right_weight * (x == p + 1 ? zero(T) : γ[x])
+    end
+
+    ΓNew = Vector{T}(undef, 2 * (p + 1))
+    @inbounds for x in 1:(p + 1)
+        ΓNew[2x] = βNew[x]
+        ΓNew[2x - 1] = γNew[x]
+    end
 
     return ΓNew
 end
@@ -36,9 +47,9 @@ function optimizeWithStrategy(qaoa::QAOA,
     @assert p < pmax
 
     energies_optima = zeros(T, pmax-p)
-    params_optima   = Vector{T}[]
+    params_optima   = Vector{Vector{T}}(undef, pmax-p)
 
-    push!(params_optima, Γ0)
+    params_optima[1] = Γ0
     energies_optima[1] = qaoa(Γ0)
 
     iter = Progress(pmax-p; desc="Optimizing QAOA energy...")
@@ -47,7 +58,7 @@ function optimizeWithStrategy(qaoa::QAOA,
         Γopt, Eopt = rollDown(qaoa, params_optima[t-1], init, alg)
         
         energies_optima[t] = Eopt
-        push!(params_optima, Γopt)
+        params_optima[t] = Γopt
 
         next!(iter; showvalues = [(:Circuit_depth, t), (:Energy, Eopt)])
     end

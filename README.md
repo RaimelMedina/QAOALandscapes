@@ -51,7 +51,14 @@ optimal_param, optimal_energy = optimizeParameters(qaoa, initial_parameter)
 Documentation is a work in progress; the dev docs link above reflects the most recent updates.
 
 # GPU
-Metal support is included but only enabled when `Metal.jl` is available. The CPU backend remains the default. CUDA support is not wired yet, but is planned alongside broader `KernelAbstractions.jl` support.
+QAOALandscapes auto-detects accelerators at load time and prefers CUDA if available, otherwise Metal, and falls back to CPU. You can override the choice with `ENV["QAOA_GPU"]` before loading the package:
+
+```julia
+ENV["QAOA_GPU"] = "metal" # or "cuda"
+using QAOALandscapes
+```
+
+To check which backend is active, call `gpu_backend()`.
 
 ## Warning
 This is a work in progress and the code is very very rudimentary. I hope in this would be in a decent state to share sometime in the future. 

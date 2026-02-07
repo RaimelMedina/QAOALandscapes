@@ -152,7 +152,7 @@ end
 include(joinpath("classical", "maxcut.jl"))
 
 # inside /experimental
-include(joinpath("experimental", "Experimental.jl"))
+include(joinpath("experimental", "experimental_module.jl"))
 
 # inside /initializations
 include(joinpath("initializations", "fourier.jl"))
